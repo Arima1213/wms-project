@@ -75,10 +75,10 @@
             </div>
             <!-- Racks in zone -->
             <div class="mt-3 grid grid-cols-4 gap-2">
-              <div v-for="rack in getRacksForZone(zone.id)" :key="rack.id"
+              <div v-for="rack in (zone.racks || [])" :key="rack.id"
                 class="p-2 bg-white rounded border border-gray-200 text-center">
                 <p class="text-xs font-mono text-gray-600">{{ rack.code }}</p>
-                <p class="text-xs text-gray-400">{{ getSlotsForRack(rack.id).length }} slot</p>
+                <p class="text-xs text-gray-400">{{ (rack.levels || []).reduce((sum, l) => sum + (l.slots || []).length, 0) }} slot</p>
               </div>
             </div>
           </div>
@@ -174,14 +174,15 @@ async function fetchData() {
   loading.value = true
   try {
     const whRes = await warehouseAPI.show(route.params.id)
-    warehouse.value = whRes.data || whRes
+    warehouse.value = whRes
 
     // Try to fetch planogram
     try {
       const pgRes = await planogramAPI.show(warehouse.value.id)
-      const pg = pgRes.data
-      if (pg) {
-        warehouse.value.planogram = pg
+      if (pgRes.data) {
+        warehouse.value.planogram = pgRes.data
+      } else if (pgRes) {
+        warehouse.value.planogram = pgRes
       }
     } catch {}
 
@@ -190,7 +191,7 @@ async function fetchData() {
     racks.value = []
     slots.value = []
     zones.value.forEach(zone => {
-      (zone.racks || []).forEach(rack => {
+      ;(zone.racks || []).forEach(rack => {
         racks.value.push(rack)
         ;(rack.levels || []).forEach(level => {
           ;(level.slots || []).forEach(slot => {
@@ -204,14 +205,6 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
-}
-
-function getRacksForZone(zoneId) {
-  return racks.value.filter(r => r.zone_id === zoneId)
-}
-
-function getSlotsForRack(rackId) {
-  return slots.value.filter(s => s.rack_id === rackId)
 }
 
 function openPlanogram() {

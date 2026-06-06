@@ -250,13 +250,13 @@ async function fetchWarehouses() {
   error.value = null
   try {
     const res = await warehouseAPI.list({ per_page: 100 })
-    const list = Array.isArray(res) ? res : (res.data || [])
+    const list = Array.isArray(res) ? res : (res.data?.data || [])
     // Fetch planogram for each warehouse
     const withPlanograms = await Promise.all(
       list.map(async (wh) => {
         try {
           const pgRes = await planogramAPI.show(wh.id)
-          return { ...wh, planogram: pgRes.data || null }
+          return { ...wh, planogram: pgRes.data || pgRes || null }
         } catch {
           return { ...wh, planogram: null }
         }

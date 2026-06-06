@@ -9,33 +9,38 @@ use Illuminate\Http\Request;
 
 class PlanogramController extends Controller
 {
+    private function getPlanogram(string|int $warehouse): Planogram|null
+    {
+        return Planogram::where('warehouse_id', $warehouse)->latest()->first();
+    }
+
     public function show(string|int $warehouse): JsonResponse
     {
-        $planogram = Planogram::where('warehouse_id', $warehouse)
-            ->with('createdBy:id,name')
-            ->latest()
-            ->first();
+        $warehouseModel = Warehouse::findOrFail($warehouse);
+        $planogram = $this->getPlanogram($warehouseModel->id);
 
         if (!$planogram) {
             return response()->json(['data' => null, 'message' => 'Planogram not found for this warehouse'], 404);
         }
 
+        $planogram->load('createdBy:id,name');
         return response()->json(['data' => $planogram]);
     }
 
     public function update(Request $request, string|int $warehouse): JsonResponse
     {
+        $warehouseModel = Warehouse::findOrFail($warehouse);
+
         $request->validate([
             'canvas_data' => 'required|array',
             'canvas_settings' => 'nullable|array',
             'change_summary' => 'nullable|string|max:500',
         ]);
 
-        $warehouse = Warehouse::findOrFail($warehouse);
         $user = $request->user();
 
         // Get current planogram or create new
-        $planogram = Planogram::where('warehouse_id', $warehouse->id)->latest()->first();
+        $planogram = $this->getPlanogram($warehouseModel->id);
 
         if ($planogram) {
             // Save snapshot of current state before updating
@@ -45,16 +50,14 @@ class PlanogramController extends Controller
                 'canvas_data' => $planogram->canvas_data,
                 'created_by' => $user->id,
                 'change_summary' => 'Auto-snapshot before edit',
-                'created_at' => $planogram->updated_at,
             ]);
+            $newVersion = implode('.', array_map(fn($v) => $v + 1, array_reverse(explode('.', $planogram->version))));
+        } else {
+            $newVersion = '1.0';
         }
 
-        $newVersion = $planogram
-            ? implode('.', array_map(fn($v) => $v + 1, array_reverse(explode('.', $planogram->version))))
-            : '1.0';
-
         $planogram = Planogram::updateOrCreate(
-            ['warehouse_id' => $warehouse->id],
+            ['warehouse_id' => $warehouseModel->id],
             [
                 'canvas_data' => $request->canvas_data,
                 'canvas_settings' => $request->canvas_settings ?? [],
@@ -69,7 +72,12 @@ class PlanogramController extends Controller
 
     public function snapshot(Request $request, string|int $warehouse): JsonResponse
     {
-        $planogram = Planogram::where('warehouse_id', $warehouse)->latest()->firstOrFail();
+        $warehouseModel = Warehouse::findOrFail($warehouse);
+        $planogram = $this->getPlanogram($warehouseModel->id);
+
+        if (!$planogram) {
+            return response()->json(['message' => 'No planogram found to snapshot'], 404);
+        }
 
         $snapshot = PlanogramSnapshot::create([
             'planogram_id' => $planogram->id,
@@ -77,7 +85,6 @@ class PlanogramController extends Controller
             'canvas_data' => $planogram->canvas_data,
             'created_by' => $request->user()->id,
             'change_summary' => $request->change_summary ?? 'Manual snapshot',
-            'created_at' => now(),
         ]);
 
         return response()->json(['data' => $snapshot], 201);
@@ -85,8 +92,18 @@ class PlanogramController extends Controller
 
     public function history(string|int $warehouse): JsonResponse
     {
-        $planogram = Planogram::where('warehouse_id', $warehouse)->latest()->firstOrFail();
-        $snapshots = $planogram->snapshots()->with('createdBy:id,name')->orderByDesc('created_at')->paginate(20);
+        $warehouseModel = Warehouse::findOrFail($warehouse);
+        $planogram = $this->getPlanogram($warehouseModel->id);
+
+        if (!$planogram) {
+            return response()->json(['data' => [], 'message' => 'No planogram found'], 404);
+        }
+
+        $snapshots = $planogram->snapshots()
+            ->with('createdBy:id,name')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
         return response()->json($snapshots);
     }
 
@@ -101,7 +118,7 @@ class PlanogramController extends Controller
             ->get();
 
         if ($products->isEmpty()) {
-            return response()->json(['data' => [], 'message' => 'Product not found'], 200);
+            return response()->json(['data' => []]);
         }
 
         return response()->json(['data' => $products]);

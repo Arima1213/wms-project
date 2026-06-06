@@ -1,0 +1,1 @@
+import{c as e,a,o as s}from"./index-C97Q-OT5.js";const o={class:"card p-6"},i={__name:"Stock",setup(n){return(c,t)=>(s(),e("div",o,[...t[0]||(t[0]=[a("h3",{class:"font-semibold text-lg mb-4"},"Stock",-1),a("p",{class:"text-gray-500"},"Manajemen stok akan ditampilkan di sini.",-1)])]))}};export{i as default};
