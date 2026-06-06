@@ -3,104 +3,59 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Zone;
+use App\Http\Requests\StoreZoneRequest;
+use App\Http\Requests\UpdateZoneRequest;
+use App\Http\Resources\ZoneResource;
+use App\Services\Warehouse\ZoneService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class ZoneController extends Controller
 {
-    public function index(string|int $warehouse): JsonResponse
+    public function __construct(private ZoneService $zoneService)
     {
-        $zones = Zone::where('warehouse_id', $warehouse)
-            ->withCount('racks')
-            ->orderBy('sort_order')
-            ->paginate(50);
-        return response()->json($zones);
     }
 
-    public function store(Request $request, string|int $warehouse): JsonResponse
+    public function index(string|int $warehouse)
     {
-        $request->validate([
-            'code' => 'required|string|max:10',
-            'name' => 'required|string|max:100',
-            'zone_type' => 'nullable|in:fast_moving,slow_moving,heavy,cold,hazmat',
-            'color' => 'nullable|string|max:7',
-            'temperature_range' => 'nullable|array',
-            'humidity_range' => 'nullable|array',
-            'allowed_product_types' => 'nullable|array',
-            'description' => 'nullable|string',
-            'sort_order' => 'nullable|integer',
-        ]);
-
-        $zone = Zone::create([
-            'warehouse_id' => $warehouse,
-            'code' => $request->code,
-            'name' => $request->name,
-            'zone_type' => $request->zone_type ?? 'fast_moving',
-            'color' => $request->color ?? '#3B82F6',
-            'temperature_range' => $request->temperature_range,
-            'humidity_range' => $request->humidity_range,
-            'allowed_product_types' => $request->allowed_product_types,
-            'description' => $request->description,
-            'sort_order' => $request->sort_order ?? 0,
-            'is_active' => true,
-        ]);
-
-        return response()->json(['data' => $zone], 201);
+        $zones = $this->zoneService->list((int) $warehouse);
+        return ZoneResource::collection($zones);
     }
 
-    public function show(string|int $warehouse, string|int $zone): JsonResponse
+    public function store(StoreZoneRequest $request, string|int $warehouse): JsonResponse
     {
-        $zone = Zone::where('warehouse_id', $warehouse)
-            ->where('id', $zone)
-            ->with('racks')
-            ->firstOrFail();
-        return response()->json(['data' => $zone]);
+        $zone = $this->zoneService->create((int) $warehouse, $request->validated());
+        return response()->json(['data' => new ZoneResource($zone)], 201);
     }
 
-    public function update(Request $request, string|int $warehouse, string|int $zone): JsonResponse
+    public function show(string|int $warehouse, string|int $zone): ZoneResource
     {
-        $zone = Zone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
+        return new ZoneResource($this->zoneService->show((int) $warehouse, (int) $zone));
+    }
 
-        $request->validate([
-            'code' => 'sometimes|required|string|max:10',
-            'name' => 'sometimes|required|string|max:100',
-            'zone_type' => 'nullable|in:fast_moving,slow_moving,heavy,cold,hazmat',
-            'color' => 'nullable|string|max:7',
-            'temperature_range' => 'nullable|array',
-            'humidity_range' => 'nullable|array',
-            'allowed_product_types' => 'nullable|array',
-            'description' => 'nullable|string',
-            'sort_order' => 'nullable|integer',
-        ]);
-
-        $zone->update($request->only([
-            'code', 'name', 'zone_type', 'color',
-            'temperature_range', 'humidity_range', 'allowed_product_types',
-            'description', 'sort_order',
-        ]));
-
-        return response()->json(['data' => $zone]);
+    public function update(UpdateZoneRequest $request, string|int $warehouse, string|int $zone): JsonResponse
+    {
+        $updated = $this->zoneService->update((int) $warehouse, (int) $zone, $request->validated());
+        return response()->json(['data' => new ZoneResource($updated)]);
     }
 
     public function destroy(string|int $warehouse, string|int $zone): JsonResponse
     {
-        $zone = Zone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
-        $zone->delete();
+        $this->authorize('zone.delete');
+        $this->zoneService->delete((int) $warehouse, (int) $zone);
         return response()->json(['message' => 'Zone deleted']);
     }
 
     public function activate(string|int $zone): JsonResponse
     {
-        $zone = Zone::findOrFail($zone);
-        $zone->update(['is_active' => true]);
-        return response()->json(['data' => $zone]);
+        $this->authorize('zone.update');
+        $updated = $this->zoneService->activate((int) $zone);
+        return response()->json(['data' => new ZoneResource($updated)]);
     }
 
     public function deactivate(string|int $zone): JsonResponse
     {
-        $zone = Zone::findOrFail($zone);
-        $zone->update(['is_active' => false]);
-        return response()->json(['data' => $zone]);
+        $this->authorize('zone.update');
+        $updated = $this->zoneService->deactivate((int) $zone);
+        return response()->json(['data' => new ZoneResource($updated)]);
     }
 }

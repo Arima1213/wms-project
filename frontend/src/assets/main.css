@@ -3,40 +3,103 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-primary: 37, 99, 235; /* Blue 600 */
+    --color-primary-light: 59, 130, 246; /* Blue 500 */
+    --color-secondary: 79, 70, 229; /* Indigo 600 */
+    --bg-main: 248, 250, 252; /* Slate 50 */
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply text-slate-800 font-sans antialiased;
+    background-color: rgb(var(--bg-main));
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(var(--color-primary), 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(var(--color-secondary), 0.05) 0px, transparent 50%);
+    background-attachment: fixed;
   }
 }
 
 @layer components {
+  /* Buttons */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-300 transform active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    @apply bg-blue-600 text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 hover:shadow-blue-600/40 focus:ring-blue-500;
   }
   .btn-secondary {
-    @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+    @apply bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:shadow-indigo-600/40 focus:ring-indigo-500;
   }
   .btn-outline {
-    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+    @apply border-2 border-slate-200 bg-white/80 backdrop-blur-sm text-slate-700 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 focus:ring-blue-500;
   }
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply bg-rose-500 text-white shadow-lg shadow-rose-500/30 hover:bg-rose-600 hover:shadow-rose-600/40 focus:ring-rose-500;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900;
   }
   .btn-sm {
-    @apply px-3 py-1.5 text-sm rounded-md;
+    @apply px-3 py-1.5 text-sm rounded-lg;
   }
-  .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200;
-  }
+  
+  /* Inputs */
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none;
+    @apply w-full px-4 py-2.5 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-xl transition-all duration-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none hover:border-slate-300;
   }
   .input-sm {
-    @apply px-2.5 py-1.5 text-sm;
+    @apply px-3 py-2 text-sm;
   }
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
   }
+
+  /* Cards */
+  .card {
+    @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)];
+  }
+
+  /* Glassmorphism Utilities */
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/50 shadow-sm;
+  }
+  .glass-dark {
+    @apply bg-slate-900/80 backdrop-blur-md border border-slate-800/50 shadow-lg;
+  }
+
+  /* Animated gradients for special text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-slate-50 rounded-full;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full transition-colors hover:bg-slate-400;
+}
+
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
 }

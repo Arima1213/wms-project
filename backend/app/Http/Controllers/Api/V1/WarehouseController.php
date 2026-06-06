@@ -3,137 +3,62 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Warehouse;
-use App\Models\Zone;
-use App\Models\Planogram;
+use App\Http\Requests\StoreWarehouseRequest;
+use App\Http\Requests\UpdateWarehouseRequest;
+use App\Http\Resources\WarehouseResource;
+use App\Services\WarehouseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class WarehouseController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function __construct(private WarehouseService $warehouseService)
     {
-        $query = Warehouse::query();
-
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(fn($q) => $q
-                ->where('name', 'ilike', "%{$search}%")
-                ->orWhere('code', 'ilike', "%{$search}%")
-            );
-        }
-
-        if ($request->has('is_active')) {
-            $query->where('is_active', $request->boolean('is_active'));
-        }
-
-        $warehouses = $query->orderBy('name')->paginate($request->get('per_page', 25));
-        return response()->json($warehouses);
     }
 
-    public function show(string|int $warehouse): JsonResponse
+    public function index(Request $request)
     {
-        $warehouse = Warehouse::with([
-            'zones' => fn($q) => $q->withCount('racks')->orderBy('sort_order'),
-            'zones.racks' => fn($q) => $q->withCount('levels')->orderBy('code'),
-            'zones.racks.levels.slots',
-            'planogram' => fn($q) => $q->latest()->take(1),
-        ])->findOrFail($warehouse);
+        $warehouses = $this->warehouseService->list(
+            $request->only(['search', 'is_active']),
+            $request->integer('per_page', 25)
+        );
 
-        return response()->json(['data' => $warehouse]);
+        return WarehouseResource::collection($warehouses);
     }
 
-    public function store(Request $request): JsonResponse
+    public function show(string|int $warehouse): WarehouseResource
     {
-        $request->validate([
-            'code' => 'required|string|max:20|unique:warehouses,code',
-            'name' => 'required|string|max:100',
-            'address' => 'nullable|string',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
-            'capacity_sqm' => 'nullable|numeric',
-            'type' => 'nullable|in:reguler,cold_storage,bonded,konsinyasi',
-            'pic_name' => 'nullable|string|max:100',
-            'pic_phone' => 'nullable|string|max:20',
-            'pic_email' => 'nullable|email',
-            'operational_hours' => 'nullable|array',
-        ]);
-
-        $warehouse = Warehouse::create($request->only([
-            'code', 'name', 'address', 'latitude', 'longitude',
-            'capacity_sqm', 'type', 'pic_name', 'pic_phone', 'pic_email', 'operational_hours',
-        ]) + ['is_active' => true]);
-
-        return response()->json(['data' => $warehouse], 201);
+        return new WarehouseResource($this->warehouseService->show((int) $warehouse));
     }
 
-    public function update(Request $request, string|int $warehouse): JsonResponse
+    public function store(StoreWarehouseRequest $request): JsonResponse
     {
-        $warehouse = Warehouse::findOrFail($warehouse);
+        $warehouse = $this->warehouseService->create($request->validated());
+        return response()->json(['data' => new WarehouseResource($warehouse)], 201);
+    }
 
-        $request->validate([
-            'code' => 'sometimes|required|string|max:20|unique:warehouses,code,' . $warehouse->id,
-            'name' => 'sometimes|required|string|max:100',
-            'address' => 'nullable|string',
-            'is_active' => 'nullable|boolean',
-        ]);
-
-        $warehouse->update($request->only([
-            'code', 'name', 'address', 'latitude', 'longitude',
-            'capacity_sqm', 'type', 'pic_name', 'pic_phone', 'pic_email',
-            'operational_hours', 'is_active',
-        ]));
-
-        return response()->json(['data' => $warehouse]);
+    public function update(UpdateWarehouseRequest $request, string|int $warehouse): JsonResponse
+    {
+        $updated = $this->warehouseService->update((int) $warehouse, $request->validated());
+        return response()->json(['data' => new WarehouseResource($updated)]);
     }
 
     public function destroy(string|int $warehouse): JsonResponse
     {
-        $warehouse = Warehouse::findOrFail($warehouse);
-        $warehouse->delete();
+        $this->authorize('warehouse.delete');
+        $this->warehouseService->delete((int) $warehouse);
         return response()->json(['message' => 'Warehouse deleted']);
     }
 
     public function summary(string|int $warehouse): JsonResponse
     {
-        $warehouse = Warehouse::with(['zones', 'planogram'])->findOrFail($warehouse);
-
-        $zoneCount = $warehouse->zones->count();
-        $rackCount = $warehouse->zones->flatMap->racks->count();
-
-        return response()->json(['data' => [
-            'warehouse_id' => $warehouse->id,
-            'zone_count' => $zoneCount,
-            'rack_count' => $rackCount,
-            'planogram_version' => $warehouse->planogram->version ?? null,
-        ]]);
+        $summary = $this->warehouseService->getSummary((int) $warehouse);
+        return response()->json(['data' => $summary]);
     }
 
     public function utilization(string|int $warehouse): JsonResponse
     {
-        $warehouse = Warehouse::with(['zones.racks.levels.slots'])->findOrFail($warehouse);
-
-        $zones = $warehouse->zones;
-        $totalSlots = 0;
-        $filledSlots = 0;
-
-        foreach ($zones as $zone) {
-            foreach ($zone->racks as $rack) {
-                foreach ($rack->levels as $level) {
-                    foreach ($level->slots as $slot) {
-                        $totalSlots++;
-                        if ($slot->fixed_product_id) $filledSlots++;
-                    }
-                }
-            }
-        }
-
-        return response()->json(['data' => [
-            'warehouse_id' => $warehouse->id,
-            'total_slots' => $totalSlots,
-            'filled_slots' => $filledSlots,
-            'empty_slots' => $totalSlots - $filledSlots,
-            'utilization_percent' => $totalSlots > 0 ? round(($filledSlots / $totalSlots) * 100, 1) : 0,
-        ]]);
+        $utilization = $this->warehouseService->getUtilization((int) $warehouse);
+        return response()->json(['data' => $utilization]);
     }
 }

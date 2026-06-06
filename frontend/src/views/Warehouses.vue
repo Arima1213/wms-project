@@ -1,242 +1,194 @@
 <template>
-  <div class="card p-6">
-    <div class="flex items-center justify-between mb-6">
-      <h3 class="font-semibold text-lg">Manajemen Gudang</h3>
-      <button @click="showCreateModal = true" class="btn btn-primary">+ Tambah Gudang</button>
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-800">Manajemen Gudang</h2>
+        <BreadCrumb :crumbs="[{label: 'Dashboard', to: '/'}, {label: 'Gudang'}]" class="mt-1" />
+      </div>
+      <button @click="openCreateModal" class="btn btn-primary">
+        + Tambah Gudang
+      </button>
     </div>
 
-    <!-- Filter -->
-    <div class="flex items-center gap-3 mb-4">
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="Cari gudang..."
-        class="input max-w-xs"
-        @input="fetchWarehouses"
-      />
-      <select v-model="filterActive" class="input w-40" @change="fetchWarehouses">
-        <option value="">Semua Status</option>
-        <option value="1">Aktif</option>
-        <option value="0">Nonaktif</option>
-      </select>
-    </div>
+    <!-- Data Table -->
+    <DataTable
+      :columns="columns"
+      :data="store.warehouses"
+      :loading="store.loading"
+      :searchable="true"
+      search-placeholder="Cari gudang..."
+      :search-keys="['code', 'name', 'city']"
+      :paginated="true"
+      :pagination="store.pagination"
+      @page-change="handlePageChange"
+    >
+      <template #toolbar>
+        <select v-model="filterActive" class="input input-sm w-40" @change="fetchData">
+          <option value="">Semua Status</option>
+          <option value="1">Aktif</option>
+          <option value="0">Nonaktif</option>
+        </select>
+      </template>
 
-    <!-- Table -->
-    <div v-if="loading" class="space-y-3">
-      <div v-for="i in 5" :key="i" class="h-12 bg-gray-50 rounded animate-pulse"></div>
-    </div>
+      <!-- Custom Cells -->
+      <template #cell-code="{ value }">
+        <span class="font-mono text-blue-600 font-medium">{{ value }}</span>
+      </template>
 
-    <div v-else-if="error" class="text-center py-8 text-red-500">
-      {{ error }}
-      <button @click="fetchWarehouses" class="btn btn-sm btn-outline ml-2">Coba Lagi</button>
-    </div>
+      <template #cell-name="{ row, value }">
+        <router-link :to="`/warehouses/${row.id}`" class="font-medium text-gray-800 hover:text-blue-600 transition-colors">
+          {{ value }}
+        </router-link>
+      </template>
 
-    <div v-else-if="warehouses.length === 0" class="text-center py-8 text-gray-400">
-      Tidak ada gudang
-    </div>
+      <template #cell-warehouse_type="{ value }">
+        <span class="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium capitalize border border-slate-200">
+          {{ value ? value.replace('_', ' ') : 'Reguler' }}
+        </span>
+      </template>
 
-    <div v-else class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50">
-          <tr class="text-left text-gray-500 border-b">
-            <th class="px-4 py-3 font-medium">Kode</th>
-            <th class="px-4 py-3 font-medium">Nama</th>
-            <th class="px-4 py-3 font-medium">Tipe</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Kapasitas</th>
-            <th class="px-4 py-3 font-medium">Aksi</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="wh in warehouses" :key="wh.id" class="hover:bg-gray-50">
-            <td class="px-4 py-3 font-mono text-blue-600">{{ wh.code }}</td>
-            <td class="px-4 py-3">
-              <router-link :to="`/warehouses/${wh.id}`" class="text-blue-600 hover:underline font-medium">
-                {{ wh.name }}
-              </router-link>
-            </td>
-            <td class="px-4 py-3">
-              <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs capitalize">
-                {{ wh.type || '-' }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <span :class="wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
-                class="px-2 py-1 rounded text-xs">
-                {{ wh.is_active ? 'Aktif' : 'Nonaktif' }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              {{ wh.capacity_sqm ? wh.capacity_sqm + ' m²' : '-' }}
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex gap-2">
-                <router-link :to="`/warehouses/${wh.id}`" class="text-blue-600 hover:underline">Detail</router-link>
-                <span class="text-gray-300">|</span>
-                <button @click="openPlanogram(wh)" class="text-blue-600 hover:underline">Planogram</button>
-                <span class="text-gray-300">|</span>
-                <button @click="editWarehouse(wh)" class="text-gray-600 hover:underline">Edit</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <template #cell-is_active="{ value }">
+        <StatusBadge :status="value ? 'active' : 'inactive'" :label="value ? 'Aktif' : 'Nonaktif'" />
+      </template>
 
-      <!-- Pagination -->
-      <div v-if="pagination.last_page > 1" class="flex items-center justify-between mt-4 pt-4 border-t">
-        <p class="text-sm text-gray-400">
-          Menampilkan {{ pagination.from }}-{{ pagination.to }} dari {{ pagination.total }}
-        </p>
-        <div class="flex gap-1">
-          <button
-            v-for="page in pagination.last_page"
-            :key="page"
-            @click="fetchWarehouses(page)"
-            :class="page === pagination.current_page ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline'"
-            class="px-3"
-          >
-            {{ page }}
+      <template #cell-actions="{ row }">
+        <div class="flex items-center gap-2">
+          <router-link :to="`/warehouses/${row.id}`" class="btn btn-sm btn-ghost text-blue-600">
+            Detail
+          </router-link>
+          <router-link :to="`/planograms/${row.id}`" class="btn btn-sm btn-ghost text-indigo-600">
+            Planogram
+          </router-link>
+          <button @click="openEditModal(row)" class="btn btn-sm btn-ghost text-gray-600">
+            Edit
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </DataTable>
 
     <!-- Create/Edit Modal -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h3 class="font-semibold text-lg mb-4">{{ editingWarehouse ? 'Edit Gudang' : 'Tambah Gudang' }}</h3>
-        <div class="space-y-4">
-          <div>
-            <label class="label">Kode Gudang</label>
-            <input v-model="form.code" type="text" class="input" placeholder="WH001" required />
-          </div>
-          <div>
-            <label class="label">Nama Gudang</label>
-            <input v-model="form.name" type="text" class="input" placeholder="Gudang Utama" required />
-          </div>
-          <div>
-            <label class="label">Tipe</label>
-            <select v-model="form.type" class="input">
-              <option value="reguler">Reguler</option>
-              <option value="cold_storage">Cold Storage</option>
-              <option value="bonded">Bonded</option>
-              <option value="konsinyasi">Konsinyasi</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">Alamat</label>
-            <input v-model="form.address" type="text" class="input" placeholder="Alamat lengkap..." />
-          </div>
-          <div>
-            <label class="label">Kapasitas (m²)</label>
-            <input v-model="form.capacity_sqm" type="number" class="input" placeholder="10000" />
-          </div>
+    <Modal v-model="showModal" :title="editingId ? 'Edit Gudang' : 'Tambah Gudang'" size="lg">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kode Gudang <span class="text-red-500">*</span></label>
+          <input v-model="form.code" type="text" class="input" placeholder="WH001" />
         </div>
-        <div class="flex justify-end gap-3 mt-6">
-          <button @click="closeModal" class="btn btn-outline">Batal</button>
-          <button @click="saveWarehouse" class="btn btn-primary" :disabled="saving">
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Tipe Gudang</label>
+          <select v-model="form.warehouse_type" class="input">
+            <option value="reguler">Reguler</option>
+            <option value="cold_storage">Cold Storage</option>
+            <option value="bonded">Bonded</option>
+            <option value="konsinyasi">Konsinyasi</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="label">Nama Gudang <span class="text-red-500">*</span></label>
+          <input v-model="form.name" type="text" class="input" placeholder="Gudang Utama" />
+        </div>
+        <div class="col-span-2">
+          <label class="label">Alamat Lengkap</label>
+          <textarea v-model="form.address" rows="2" class="input resize-none" placeholder="Alamat..."></textarea>
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kota</label>
+          <input v-model="form.city" type="text" class="input" placeholder="Jakarta" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kapasitas (m²)</label>
+          <input v-model="form.capacity_m2" type="number" class="input" placeholder="1000" />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button @click="showModal = false" class="btn btn-outline">Batal</button>
+          <button @click="save" class="btn btn-primary" :disabled="saving">
             {{ saving ? 'Menyimpan...' : 'Simpan' }}
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { warehouseAPI } from '../services/api'
+import { useWarehouseStore } from '../stores/warehouse'
+import DataTable from '../components/common/DataTable.vue'
+import Modal from '../components/common/Modal.vue'
+import StatusBadge from '../components/common/StatusBadge.vue'
+import BreadCrumb from '../components/common/BreadCrumb.vue'
 
-const router = useRouter()
+const store = useWarehouseStore()
 
-const warehouses = ref([])
-const loading = ref(true)
-const error = ref(null)
-const searchQuery = ref('')
+const columns = [
+  { key: 'code', label: 'Kode', sortable: true },
+  { key: 'name', label: 'Nama Gudang', sortable: true },
+  { key: 'warehouse_type', label: 'Tipe', sortable: true },
+  { key: 'city', label: 'Kota', sortable: true },
+  { key: 'is_active', label: 'Status', sortable: true },
+  { key: 'actions', label: 'Aksi', sortable: false, headerClass: 'text-right', cellClass: 'text-right' },
+]
+
 const filterActive = ref('')
-const pagination = ref({ last_page: 1, current_page: 1, from: 0, to: 0, total: 0 })
-const showCreateModal = ref(false)
-const editingWarehouse = ref(null)
+const showModal = ref(false)
+const editingId = ref(null)
 const saving = ref(false)
 
 const form = ref({
-  code: '',
-  name: '',
-  type: 'reguler',
-  address: '',
-  capacity_sqm: '',
+  code: '', name: '', warehouse_type: 'reguler',
+  address: '', city: '', capacity_m2: null
 })
 
-async function fetchWarehouses(page = 1) {
-  loading.value = true
-  error.value = null
-  try {
-    const params = { page, per_page: 20 }
-    if (searchQuery.value) params.search = searchQuery.value
-    if (filterActive.value !== '') params.is_active = filterActive.value
-
-    const res = await warehouseAPI.list(params)
-    const payload = Array.isArray(res) ? { data: res, last_page: 1, current_page: 1, from: 0, to: 0, total: res.length }
-              : Array.isArray(res.data) ? { data: res.data, ...res }
-              : res
-    warehouses.value = payload.data || payload
-    pagination.value = {
-      last_page: payload.last_page || 1,
-      current_page: payload.current_page || 1,
-      from: payload.from || 1,
-      to: payload.to || (payload.data || payload).length,
-      total: payload.total || (payload.data || payload).length,
-    }
-  } catch (e) {
-    error.value = e.message || 'Gagal memuat gudang'
-  } finally {
-    loading.value = false
-  }
+function fetchData(page = 1) {
+  const params = { page, per_page: 25 }
+  if (filterActive.value !== '') params.is_active = filterActive.value
+  store.fetchList(params)
 }
 
-function openPlanogram(wh) {
-  router.push(`/planograms/${wh.id}`)
+function handlePageChange(page) {
+  fetchData(page)
 }
 
-function editWarehouse(wh) {
-  editingWarehouse.value = wh
+function openCreateModal() {
+  editingId.value = null
+  form.value = { code: '', name: '', warehouse_type: 'reguler', address: '', city: '', capacity_m2: null }
+  showModal.value = true
+}
+
+function openEditModal(row) {
+  editingId.value = row.id
   form.value = {
-    code: wh.code,
-    name: wh.name,
-    type: wh.type || 'reguler',
-    address: wh.address || '',
-    capacity_sqm: wh.capacity_sqm || '',
+    code: row.code,
+    name: row.name,
+    warehouse_type: row.warehouse_type || 'reguler',
+    address: row.address || '',
+    city: row.city || '',
+    capacity_m2: row.capacity_m2 || null
   }
-  showCreateModal.value = true
+  showModal.value = true
 }
 
-function closeModal() {
-  showCreateModal.value = false
-  editingWarehouse.value = null
-  form.value = { code: '', name: '', type: 'reguler', address: '', capacity_sqm: '' }
-}
-
-async function saveWarehouse() {
+async function save() {
   if (!form.value.code || !form.value.name) return
   saving.value = true
   try {
-    const data = { ...form.value }
-    if (form.value.capacity_sqm) data.capacity_sqm = Number(form.value.capacity_sqm)
-
-    if (editingWarehouse.value) {
-      await warehouseAPI.update(editingWarehouse.value.id, data)
+    const payload = { ...form.value }
+    if (editingId.value) {
+      await store.update(editingId.value, payload)
     } else {
-      await warehouseAPI.create(data)
+      await store.create(payload)
     }
-    closeModal()
-    await fetchWarehouses()
+    showModal.value = false
+    fetchData(store.pagination?.current_page || 1)
   } catch (e) {
-    alert('Gagal menyimpan: ' + (e.response?.data?.message || e.message))
+    // error handled by store/notification
   } finally {
     saving.value = false
   }
 }
 
-onMounted(() => fetchWarehouses())
+onMounted(() => {
+  fetchData()
+})
 </script>
