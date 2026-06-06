@@ -96,6 +96,31 @@ class InboundController extends Controller
         // Create stock items for each inbound item
         foreach ($inbound->items as $item) {
             $item->update(['received_qty' => $item->qty, 'received_at' => now()]);
+
+            // Add to Inventory
+            $inventory = \App\Models\Inventory::firstOrNew([
+                'product_id' => $item->product_id,
+                'warehouse_id' => $inbound->warehouse_id,
+                'batch_number' => $item->batch_number,
+                'rack_slot_id' => null, // Optional, can be mapped to a default receiving slot later
+            ]);
+            
+            $inventory->quantity += $item->qty;
+            if ($item->expiry_date) {
+                $inventory->expiry_date = $item->expiry_date;
+            }
+            $inventory->save();
+
+            // Record transaction
+            \App\Models\InventoryTransaction::create([
+                'inventory_id' => $inventory->id,
+                'type' => 'in',
+                'quantity' => $item->qty,
+                'reference_type' => 'inbound',
+                'reference_id' => $inbound->id,
+                'notes' => 'Received from inbound ' . $inbound->inbound_number,
+                'created_by' => $request->user()->id,
+            ]);
         }
 
         return response()->json(['data' => $inbound]);

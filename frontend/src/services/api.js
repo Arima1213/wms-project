@@ -62,12 +62,12 @@ export const productAPI = {
   search: (q) => api.get('/products/search', { params: { q } }),
 }
 
-// Stock
-export const stockAPI = {
-  summary: () => api.get('/stock/summary'),
-  lowStock: () => api.get('/stock/low-stock'),
-  transfer: (data) => api.post('/stock/transfer', data),
-  adjust: (data) => api.post('/stock/adjust', data),
+// Inventory
+export const inventoryAPI = {
+  index: (params) => api.get('/inventory', { params }),
+  stock: (params) => api.get('/inventory/stock', { params }),
+  alerts: (params) => api.get('/inventory/alerts', { params }),
+  trace: (sku) => api.get(`/inventory/trace/${sku}`),
 }
 
 // Inbounds
@@ -76,8 +76,8 @@ export const inboundAPI = {
   show: (uuid) => api.get(`/inbounds/${uuid}`),
   create: (data) => api.post('/inbounds', data),
   update: (uuid, data) => api.put(`/inbounds/${uuid}`, data),
-  pending: () => api.get('/inbounds/pending'),
   receive: (uuid, data) => api.post(`/inbounds/${uuid}/receive`, data),
+  cancel: (uuid, data) => api.post(`/inbounds/${uuid}/cancel`, data),
 }
 
 // Outbounds
@@ -86,8 +86,20 @@ export const outboundAPI = {
   show: (uuid) => api.get(`/outbounds/${uuid}`),
   create: (data) => api.post('/outbounds', data),
   update: (uuid, data) => api.put(`/outbounds/${uuid}`, data),
-  pending: () => api.get('/outbounds/pending'),
+  pick: (uuid, data) => api.post(`/outbounds/${uuid}/pick`, data),
   ship: (uuid, data) => api.post(`/outbounds/${uuid}/ship`, data),
+  cancel: (uuid, data) => api.post(`/outbounds/${uuid}/cancel`, data),
+}
+
+// Stock Opnames
+export const stockOpnameAPI = {
+  list: (params) => api.get('/stock-opnames', { params }),
+  show: (uuid) => api.get(`/stock-opnames/${uuid}`),
+  create: (data) => api.post('/stock-opnames', data),
+  update: (uuid, data) => api.put(`/stock-opnames/${uuid}`, data),
+  start: (uuid) => api.post(`/stock-opnames/${uuid}/start`),
+  submit: (uuid, data) => api.post(`/stock-opnames/${uuid}/submit`, data),
+  approve: (uuid, data) => api.post(`/stock-opnames/${uuid}/approve`, data),
 }
 
 // Planograms

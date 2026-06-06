@@ -105,6 +105,33 @@ class OutboundController extends Controller
             'status' => 'shipped',
             'shipped_date' => now(),
         ]);
+
+        foreach ($outbound->items as $item) {
+            $item->update(['picked_qty' => $item->qty]);
+
+            // Deduct from Inventory
+            $inventory = \App\Models\Inventory::where([
+                'product_id' => $item->product_id,
+                'warehouse_id' => $outbound->warehouse_id,
+            ])->first();
+            
+            if ($inventory) {
+                $inventory->quantity = max(0, $inventory->quantity - $item->qty);
+                $inventory->save();
+
+                // Record transaction
+                \App\Models\InventoryTransaction::create([
+                    'inventory_id' => $inventory->id,
+                    'type' => 'out',
+                    'quantity' => $item->qty,
+                    'reference_type' => 'outbound',
+                    'reference_id' => $outbound->id,
+                    'notes' => 'Shipped for outbound ' . $outbound->outbound_number,
+                    'created_by' => $request->user()->id,
+                ]);
+            }
+        }
+
         return response()->json(['data' => $outbound]);
     }
 

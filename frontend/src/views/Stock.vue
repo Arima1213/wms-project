@@ -95,12 +95,34 @@
     <!-- Modals Placeholders -->
     <Modal v-model="showTransferModal" title="Transfer Stok Antar Lokasi" size="lg">
       <div class="text-center py-8 text-gray-500">
-        Form pemindahan stok gudang dalam pengembangan.
+        <p>Fitur pemindahan stok akan tersedia melalui modul Transfer Antar Gudang.</p>
+        <button @click="showTransferModal = false" class="btn btn-outline mt-4">Tutup</button>
       </div>
     </Modal>
+
+    <!-- Adjustment Modal uses Stock Opname creation -->
     <Modal v-model="showAdjustModal" title="Penyesuaian Stok (Adjusment)" size="md">
-      <div class="text-center py-8 text-gray-500">
-        Form penyesuaian (opname/adjustment) dalam pengembangan.
+      <div class="space-y-4">
+        <p class="text-sm text-gray-500 mb-4">
+          Penyesuaian stok harus melalui proses <strong>Stock Opname</strong>. Form ini akan membuat dokumen Stock Opname baru dengan status Draft.
+        </p>
+        <div>
+          <label class="label">Pilih Gudang Target</label>
+          <select v-model="adjustForm.warehouse_id" class="input w-full" required>
+            <option value="">-- Pilih Gudang --</option>
+            <option v-for="wh in warehouses" :key="wh.id" :value="wh.id">{{ wh.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="label">Catatan / Keterangan</label>
+          <textarea v-model="adjustForm.notes" class="input w-full h-24" placeholder="Misal: Penyesuaian stok rusak bulan Juni..."></textarea>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button @click="showAdjustModal = false" class="btn btn-outline">Batal</button>
+          <button @click="submitAdjustment" :disabled="!adjustForm.warehouse_id || submitting" class="btn btn-primary">
+            {{ submitting ? 'Memproses...' : 'Buat Stock Opname' }}
+          </button>
+        </div>
       </div>
     </Modal>
   </div>
@@ -108,16 +130,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useStockStore } from '../stores/stock'
-import { warehouseAPI } from '../services/api'
+import { warehouseAPI, stockOpnameAPI } from '../services/api'
 import DataTable from '../components/common/DataTable.vue'
 import Modal from '../components/common/Modal.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import BreadCrumb from '../components/common/BreadCrumb.vue'
 import { useDebounce } from '../composables/useDebounce'
+import { useNotificationStore } from '../stores/notification'
 import { ArrowDownTrayIcon, ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
 
 const store = useStockStore()
+const router = useRouter()
+const notify = useNotificationStore()
 
 const columns = [
   { key: 'product', label: 'Produk', sortable: false },
@@ -132,6 +158,12 @@ const currentSearch = ref('')
 const warehouses = ref([])
 const showTransferModal = ref(false)
 const showAdjustModal = ref(false)
+
+const submitting = ref(false)
+const adjustForm = ref({
+  warehouse_id: '',
+  notes: ''
+})
 
 function formatNumber(num) {
   return new Intl.NumberFormat('id-ID').format(num)
@@ -167,6 +199,23 @@ function handleSearch(query) {
 
 function exportData() {
   alert('Fitur export sedang disiapkan')
+}
+
+async function submitAdjustment() {
+  if (!adjustForm.value.warehouse_id) return
+  submitting.value = true
+  try {
+    const res = await stockOpnameAPI.create(adjustForm.value)
+    notify.success('Stock Opname (Draft) berhasil dibuat!')
+    showAdjustModal.value = false
+    adjustForm.value = { warehouse_id: '', notes: '' }
+    // Could route to opname detail page if implemented, e.g.:
+    // router.push(`/stock-opnames/${res.data.id}`)
+  } catch (e) {
+    notify.error('Gagal membuat Stock Opname')
+  } finally {
+    submitting.value = false
+  }
 }
 
 onMounted(() => {
