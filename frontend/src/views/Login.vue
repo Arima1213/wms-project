@@ -51,8 +51,8 @@ const handleLogin = async () => {
   error.value = ''
   try {
     const res = await authAPI.login(form.value)
-    localStorage.setItem('wms_token', res.data.token)
-    localStorage.setItem('wms_user', JSON.stringify(res.data.user))
+    localStorage.setItem('wms_token', res.token)
+    localStorage.setItem('wms_user', JSON.stringify(res.user))
     router.push('/')
   } catch (e) {
     error.value = e.response?.data?.message || 'Login failed. Check your credentials.'

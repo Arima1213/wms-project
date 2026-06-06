@@ -10,9 +10,9 @@
           <h1 class="text-xl font-semibold text-gray-800">{{ warehouse?.name }}</h1>
           <p class="text-sm text-gray-400 font-mono">{{ warehouse?.code }}</p>
         </div>
-        <span :class="warehouse?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+        <span :class="warehouse?.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
           class="px-2 py-1 rounded text-xs font-medium">
-          {{ warehouse?.status }}
+          {{ warehouse?.is_active ? 'Aktif' : 'Nonaktif' }}
         </span>
       </div>
       <div class="flex gap-2">
@@ -91,7 +91,7 @@
         <div class="space-y-4">
           <div>
             <label class="text-xs text-gray-400">Tipe</label>
-            <p class="text-sm font-medium text-gray-700 capitalize">{{ warehouse?.type }}</p>
+            <p class="text-sm font-medium text-gray-700 capitalize">{{ warehouse?.warehouse_type || '-' }}</p>
           </div>
           <div>
             <label class="text-xs text-gray-400">Alamat</label>
@@ -99,7 +99,7 @@
           </div>
           <div>
             <label class="text-xs text-gray-400">Kapasitas</label>
-            <p class="text-sm text-gray-700">{{ warehouse?.capacity || '-' }}</p>
+            <p class="text-sm text-gray-700">{{ warehouse?.capacity_m2 ? warehouse.capacity_m2 + ' m²' : '-' }}</p>
           </div>
           <div>
             <label class="text-xs text-gray-400">Planogram</label>
@@ -179,29 +179,26 @@ async function fetchData() {
     // Try to fetch planogram
     try {
       const pgRes = await planogramAPI.show(warehouse.value.id)
-      if (pgRes.data) {
-        warehouse.value = { ...warehouse.value, planogram: pgRes.data }
+      const pg = pgRes.data
+      if (pg) {
+        warehouse.value.planogram = pg
       }
     } catch {}
 
-    // Mock zones/racks/slots for now
-    zones.value = [
-      { id: 1, code: 'ZN-A', name: 'Zone A - Elektronik', is_active: true },
-      { id: 2, code: 'ZN-B', name: 'Zone B - Packaging', is_active: true },
-      { id: 3, code: 'ZN-C', name: 'Zone C - Accessories', is_active: false },
-    ]
-    racks.value = [
-      { id: 1, code: 'RA-01', zone_id: 1 },
-      { id: 2, code: 'RA-02', zone_id: 1 },
-      { id: 3, code: 'RB-01', zone_id: 2 },
-      { id: 4, code: 'RB-02', zone_id: 2 },
-      { id: 5, code: 'RC-01', zone_id: 3 },
-    ]
-    slots.value = Array.from({ length: 24 }, (_, i) => ({
-      id: i + 1,
-      rack_id: (i % 5) + 1,
-      product_id: i < 16 ? 1 : null,
-    }))
+    // Load zones from API response (nested: zones -> racks -> levels -> slots)
+    zones.value = warehouse.value.zones || []
+    racks.value = []
+    slots.value = []
+    zones.value.forEach(zone => {
+      (zone.racks || []).forEach(rack => {
+        racks.value.push(rack)
+        ;(rack.levels || []).forEach(level => {
+          ;(level.slots || []).forEach(slot => {
+            slots.value.push({ ...slot, rack_id: rack.id })
+          })
+        })
+      })
+    })
   } catch (e) {
     console.error(e)
   } finally {
