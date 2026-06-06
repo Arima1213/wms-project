@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class PlanogramController extends Controller
 {
-    public function show(int $warehouse): JsonResponse
+    public function show(string|int $warehouse): JsonResponse
     {
         $planogram = Planogram::where('warehouse_id', $warehouse)
             ->with('createdBy:id,name')
@@ -23,7 +23,7 @@ class PlanogramController extends Controller
         return response()->json(['data' => $planogram]);
     }
 
-    public function update(Request $request, int $warehouse): JsonResponse
+    public function update(Request $request, string|int $warehouse): JsonResponse
     {
         $request->validate([
             'canvas_data' => 'required|array',
@@ -67,7 +67,7 @@ class PlanogramController extends Controller
         return response()->json(['data' => $planogram]);
     }
 
-    public function snapshot(Request $request, int $warehouse): JsonResponse
+    public function snapshot(Request $request, string|int $warehouse): JsonResponse
     {
         $planogram = Planogram::where('warehouse_id', $warehouse)->latest()->firstOrFail();
 
@@ -83,7 +83,7 @@ class PlanogramController extends Controller
         return response()->json(['data' => $snapshot], 201);
     }
 
-    public function history(int $warehouse): JsonResponse
+    public function history(string|int $warehouse): JsonResponse
     {
         $planogram = Planogram::where('warehouse_id', $warehouse)->latest()->firstOrFail();
         $snapshots = $planogram->snapshots()->with('createdBy:id,name')->orderByDesc('created_at')->paginate(20);
@@ -94,25 +94,16 @@ class PlanogramController extends Controller
     {
         $request->validate(['q' => 'required|string|min:2']);
 
-        $product = \App\Models\Product::where('name', 'ilike', '%' . $request->q . '%')
+        $products = \App\Models\Product::where('name', 'ilike', '%' . $request->q . '%')
             ->orWhere('sku', 'ilike', '%' . $request->q . '%')
             ->orWhere('barcode', 'ilike', '%' . $request->q . '%')
-            ->first();
-
-        if (!$product) {
-            return response()->json(['message' => 'Product not found'], 404);
-        }
-
-        // Find all inventory locations for this product
-        $locations = \App\Models\Inventory::with([
-            'warehouse:id,code,name', 'rackSlot:id,slot_code',
-            'rackSlot.rackLevel.rack:id,code,pos_x,pos_y',
-            'rackSlot.rackLevel.rack.zone:id,code,name',
-        ])
-            ->where('product_id', $product->id)
-            ->where('quantity', '>', 0)
+            ->limit(20)
             ->get();
 
-        return response()->json(['product' => $product, 'locations' => $locations]);
+        if ($products->isEmpty()) {
+            return response()->json(['data' => [], 'message' => 'Product not found'], 200);
+        }
+
+        return response()->json(['data' => $products]);
     }
 }

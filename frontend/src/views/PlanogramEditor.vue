@@ -120,7 +120,10 @@
       </aside>
 
       <!-- Canvas Area -->
-      <div class="flex-1 overflow-auto bg-gray-100 p-4" ref="canvasContainer">
+      <div class="flex-1 overflow-auto bg-gray-100 p-4" ref="canvasContainer"
+        @dragover.prevent
+        @drop.prevent="onCanvasDrop"
+      >
         <div class="relative bg-white shadow-lg rounded-lg overflow-hidden" :style="canvasContainerStyle">
           <!-- Grid overlay -->
           <div v-if="gridSnap" class="absolute inset-0 pointer-events-none" :style="gridOverlayStyle"></div>
@@ -385,7 +388,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { warehouseAPI, planogramAPI, productAPI } from '../services/api'
+import { warehouseAPI, planogramAPI } from '../services/api'
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
@@ -585,8 +588,8 @@ async function searchProducts() {
   searchTimeout = setTimeout(async () => {
     productSearchLoading.value = true
     try {
-      const res = await productAPI.search(productSearch.value)
-      searchResults.value = Array.isArray(res) ? res : (res.data || [])
+      const res = await planogramAPI.searchProduct(productSearch.value)
+      searchResults.value = res.data || []
     } catch {
       searchResults.value = []
     } finally {
@@ -596,19 +599,46 @@ async function searchProducts() {
 }
 
 function onProductDragStart(event, product) {
+  // Store in localStorage so onStageClick can read it (Konva stage can't access dataTransfer)
+  localStorage.setItem('_dragProduct', JSON.stringify(product))
   event.dataTransfer.setData('application/json', JSON.stringify(product))
   event.dataTransfer.effectAllowed = 'copy'
 }
 
 function onStageClick(e) {
-  // handled by mousedown/mouseup
+  const stage = stageRef.value?.getStage()
+  if (!stage) return
+  const pos = stage.getPointerPosition()
+  if (activeTool.value === 'item') {
+    // Read product stored during drag from sidebar
+    const raw = localStorage.getItem('_dragProduct')
+    if (raw) {
+      try {
+        const product = JSON.parse(raw)
+        addItemAt(snapToGrid(pos.x), snapToGrid(pos.y), product)
+        localStorage.removeItem('_dragProduct')
+      } catch {}
+    }
+  }
 }
 
-function onStageMouseDown(e) {
-  if (activeTool.value === 'zone') {
+function onCanvasDrop(e) {
+  const raw = e.dataTransfer?.getData('application/json')
+  if (!raw) return
+  try {
+    const product = JSON.parse(raw)
     const stage = stageRef.value?.getStage()
     if (!stage) return
     const pos = stage.getPointerPosition()
+    addItemAt(snapToGrid(pos.x), snapToGrid(pos.y), product)
+  } catch {}
+}
+
+function onStageMouseDown(e) {
+  const stage = stageRef.value?.getStage()
+  if (!stage) return
+  const pos = stage.getPointerPosition()
+  if (activeTool.value === 'zone') {
     isDrawing.value = true
     drawStart.value = { x: snapToGrid(pos.x), y: snapToGrid(pos.y) }
     drawingPreview.value = {
@@ -672,18 +702,14 @@ function onStageMouseUp(e) {
   scheduleAutoSave()
 }
 
-function onStageClick(e) {
-  const stage = stageRef.value?.getStage()
-  if (!stage) return
-  const pos = stage.getPointerPosition()
-  if (activeTool.value === 'item') {
-    // Drop product from sidebar
-    const data = window._dragProductData
-    if (data) {
-      addItemAt(snapToGrid(pos.x), snapToGrid(pos.y), data)
-      window._dragProductData = null
-    }
-  }
+function selectZone(idx) {
+  selectedZoneIdx.value = idx
+  selectedItemIdx.value = null
+}
+
+function selectItem(idx) {
+  selectedItemIdx.value = idx
+  selectedZoneIdx.value = null
 }
 
 function addItemAt(x, y, product) {
@@ -701,16 +727,6 @@ function addItemAt(x, y, product) {
   selectedZoneIdx.value = null
   hasChanges.value = true
   scheduleAutoSave()
-}
-
-function selectZone(idx) {
-  selectedZoneIdx.value = idx
-  selectedItemIdx.value = null
-}
-
-function selectItem(idx) {
-  selectedItemIdx.value = idx
-  selectedZoneIdx.value = null
 }
 
 function onItemDragMove(e) {
@@ -809,22 +825,6 @@ function formatTime(date) {
 
 // Handle dragover on canvas for product drop
 onMounted(async () => {
-  const container = canvasContainer.value
-  if (container) {
-    container.addEventListener('dragover', e => e.preventDefault())
-    container.addEventListener('drop', e => {
-      e.preventDefault()
-      const raw = e.dataTransfer.getData('application/json')
-      if (!raw) return
-      const product = JSON.parse(raw)
-      const rect = container.querySelector('canvas')?.getBoundingClientRect()
-      if (!rect) return
-      const x = snapToGrid(e.clientX - rect.left)
-      const y = snapToGrid(e.clientY - rect.top)
-      addItemAt(x, y, product)
-    })
-  }
-
   window.addEventListener('keydown', handleKeydown)
 
   // Load warehouse + planogram
