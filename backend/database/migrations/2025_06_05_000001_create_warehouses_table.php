@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create("warehouses", function (Blueprint $table) {
+            $table->id();
+            $table->string("code", 20)->unique();
+            $table->string("name");
+            $table->text("address")->nullable();
+            $table->decimal("latitude", 10, 8)->nullable();
+            $table->decimal("longitude", 11, 8)->nullable();
+            $table->decimal("capacity_sqm", 12, 2)->default(0);
+            $table->decimal("used_capacity_sqm", 12, 2)->default(0);
+            $table->enum("type", ["reguler", "cold_storage", "bonded", "konsinyasi"])->default("reguler");
+            $table->string("pic_name")->nullable();
+            $table->string("pic_phone")->nullable();
+            $table->json("operational_hours")->nullable();
+            $table->boolean("is_active")->default(true);
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists("warehouses");
+    }
+};

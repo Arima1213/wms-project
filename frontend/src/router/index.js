@@ -1,0 +1,80 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: { guest: true }
+  },
+  {
+    path: '/',
+    component: () => import('../layouts/MainLayout.vue'),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'Dashboard',
+        component: () => import('../views/Dashboard.vue')
+      },
+      {
+        path: 'warehouses',
+        name: 'Warehouses',
+        component: () => import('../views/Warehouses.vue')
+      },
+      {
+        path: 'products',
+        name: 'Products',
+        component: () => import('../views/Products.vue')
+      },
+      {
+        path: 'inbounds',
+        name: 'Inbounds',
+        component: () => import('../views/Inbounds.vue')
+      },
+      {
+        path: 'outbounds',
+        name: 'Outbounds',
+        component: () => import('../views/Outbounds.vue')
+      },
+      {
+        path: 'stock',
+        name: 'Stock',
+        component: () => import('../views/Stock.vue')
+      },
+      {
+        path: 'planograms',
+        name: 'Planograms',
+        component: () => import('../views/Planograms.vue')
+      },
+      {
+        path: 'reports',
+        name: 'Reports',
+        component: () => import('../views/Reports.vue')
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('../views/Settings.vue')
+      }
+    ]
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('wms_token')
+  if (to.meta.requiresAuth && !token) {
+    next({ name: 'Login' })
+  } else if (to.meta.guest && token) {
+    next({ name: 'Dashboard' })
+  } else {
+    next()
+  }
+})
+
+export default router

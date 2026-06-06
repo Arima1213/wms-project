@@ -1,0 +1,206 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wms-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+      - app-storage:/var/www/storage
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8000
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=wms
+      - DB_USERNAME=wms
+      - DB_PASSWORD=wms_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - FILESYSTEM_DISK=minio
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=wms
+      - MEILISEARCH_HOST=http://meilisearch:7700
+      - MEILISEARCH_KEY=masterKey
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - wms-network
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: wms-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www
+      - ./backend/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - wms-network
+
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: wms-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=wms
+      - POSTGRES_USER=wms
+      - POSTGRES_PASSWORD=wms_secret
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wms -d wms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wms-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: wms-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - wms-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: wms-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_DEFAULT_BUCKETS=wms
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - wms-network
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    container_name: wms-meilisearch
+    restart: unless-stopped
+    environment:
+      - MEILI_MASTER_KEY=masterKey
+      - MEILI_ENV=development
+    volumes:
+      - meilisearch-data:/meili_data
+    ports:
+      - "7700:7700"
+    networks:
+      - wms-network
+
+  horizon:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wms-horizon
+    restart: unless-stopped
+    command: php artisan horizon
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+      - app-storage:/var/www/storage
+    environment:
+      - APP_ENV=local
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=wms
+      - DB_USERNAME=wms
+      - DB_PASSWORD=wms_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - wms-network
+
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wms-reverb
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    environment:
+      - APP_ENV=local
+      - REVERB_HOST=0.0.0.0
+      - REVERB_PORT=8080
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=wms
+      - DB_USERNAME=wms
+      - DB_PASSWORD=wms_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks:
+      - wms-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wms-frontend
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api
+      - VITE_WS_URL=ws://localhost:8080
+    ports:
+      - "5173:5173"
+    networks:
+      - wms-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  meilisearch-data:
+  app-storage:
+
+networks:
+  wms-network:
+    driver: bridge
