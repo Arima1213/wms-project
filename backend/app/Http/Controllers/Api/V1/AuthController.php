@@ -19,13 +19,12 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $user = User::where('email', $request->email)->first();
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $user = Auth::user();
         if (!$user->is_active) {
-            Auth::logout();
             return response()->json(['message' => 'Account is deactivated'], 403);
         }
 

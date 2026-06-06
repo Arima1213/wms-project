@@ -37,10 +37,10 @@ export default api
 
 // Auth
 export const authAPI = {
-  login: (data) => api.post('/auth/login', data),
-  register: (data) => api.post('/auth/register', data),
-  logout: () => api.post('/auth/logout'),
-  me: () => api.get('/auth/me'),
+  login: (data) => api.post('/login', data),
+  register: (data) => api.post('/register', data),
+  logout: () => api.post('/logout'),
+  me: () => api.get('/me'),
 }
 
 // Warehouses
