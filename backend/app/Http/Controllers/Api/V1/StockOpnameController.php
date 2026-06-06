@@ -57,6 +57,34 @@ class StockOpnameController extends Controller
         return response()->json(['data' => $opname]);
     }
 
+    public function update(Request $request, string|int $opnameId): JsonResponse
+    {
+        $opname = StockOpname::findOrFail($opnameId);
+        
+        $validated = $request->validate([
+            'notes' => 'nullable|string',
+            'items' => 'nullable|array',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.system_qty' => 'required|numeric',
+            'items.*.actual_qty' => 'required|numeric',
+            'items.*.difference_qty' => 'required|numeric',
+        ]);
+
+        if (isset($validated['notes'])) {
+            $opname->update(['notes' => $validated['notes']]);
+        }
+
+        if (isset($validated['items'])) {
+            // Clear existing items and recreate
+            $opname->items()->delete();
+            foreach ($validated['items'] as $item) {
+                $opname->items()->create($item);
+            }
+        }
+
+        return response()->json(['data' => $opname->load('items')]);
+    }
+
     public function submit(Request $request, string|int $opname): JsonResponse
     {
         $opname = StockOpname::findOrFail($opname);

@@ -106,12 +106,21 @@
           <textarea v-model="form.description" rows="2" class="input resize-none" placeholder="Deskripsi..."></textarea>
         </div>
         <div class="col-span-2 sm:col-span-1">
-          <label class="label">Kategori ID</label>
-          <input v-model="form.category_id" type="number" class="input" placeholder="1" />
+          <label class="label">Kategori</label>
+          <select v-model="form.category_id" class="input">
+            <option :value="null">-- Pilih Kategori --</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+          </select>
         </div>
         <div class="col-span-2 sm:col-span-1">
-          <label class="label">Satuan Dasar (Unit ID)</label>
-          <input v-model="form.unit_id" type="number" class="input" placeholder="1" />
+          <label class="label">Satuan Dasar (Unit)</label>
+          <select v-model="form.unit_id" class="input">
+            <option :value="null">-- Pilih Satuan --</option>
+            <option value="1">Pcs</option>
+            <option value="2">Box</option>
+            <option value="3">Kg</option>
+            <option value="4">Liter</option>
+          </select>
         </div>
         
         <div class="col-span-2 mt-2 pt-4 border-t border-gray-100 grid grid-cols-4 gap-3">
@@ -163,6 +172,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useProductStore } from '../stores/product'
+import { categoryAPI } from '../services/api'
 import DataTable from '../components/common/DataTable.vue'
 import Modal from '../components/common/Modal.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
@@ -185,6 +195,7 @@ const currentSearch = ref('')
 const showModal = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
+const categories = ref([])
 
 const form = ref({
   code: '', sku: '', barcode: '', name: '', description: '',
@@ -265,7 +276,17 @@ async function save() {
   }
 }
 
+async function fetchCategories() {
+  try {
+    const res = await categoryAPI.list()
+    categories.value = Array.isArray(res) ? res : (res.data || [])
+  } catch (error) {
+    console.error('Failed to load categories', error)
+  }
+}
+
 onMounted(() => {
+  fetchCategories()
   fetchData()
 })
 </script>

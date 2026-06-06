@@ -62,6 +62,11 @@ export const productAPI = {
   search: (q) => api.get('/products/search', { params: { q } }),
 }
 
+// Categories
+export const categoryAPI = {
+  list: (params) => api.get('/categories', { params }),
+}
+
 // Inventory
 export const inventoryAPI = {
   index: (params) => api.get('/inventory', { params }),
@@ -102,6 +107,16 @@ export const stockOpnameAPI = {
   approve: (uuid, data) => api.post(`/stock-opnames/${uuid}/approve`, data),
 }
 
+// Transfers
+export const transferAPI = {
+  list: (params) => api.get('/transfers', { params }),
+  show: (uuid) => api.get(`/transfers/${uuid}`),
+  create: (data) => api.post('/transfers', data),
+  approve: (uuid) => api.post(`/transfers/${uuid}/approve`),
+  reject: (uuid) => api.post(`/transfers/${uuid}/reject`),
+  execute: (uuid) => api.post(`/transfers/${uuid}/execute`),
+}
+
 // Planograms
 export const planogramAPI = {
   // GET /v1/warehouses/{id}/planogram
@@ -124,9 +139,9 @@ export const dashboardAPI = {
 // Reports
 export const reportAPI = {
   stock: (params) => api.get('/reports/stock', { params }),
-  movement: (params) => api.get('/reports/movement', { params }),
+  movement: (params) => api.get('/reports/mutations', { params }),
   valuation: (params) => api.get('/reports/valuation', { params }),
-  warehouseUtilization: (params) => api.get('/reports/warehouse-utilization', { params }),
+  warehouseUtilization: (params) => api.get('/reports/utilization', { params }),
 }
 
 // Settings

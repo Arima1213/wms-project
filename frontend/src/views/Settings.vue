@@ -53,17 +53,19 @@
           <div class="space-y-4 max-w-md">
             <div>
               <label class="label">Nama Perusahaan</label>
-              <input type="text" class="input" value="PT Logistik Nusantara Jaya" />
+              <input type="text" v-model="settings.company_name" class="input" placeholder="PT Logistik Nusantara Jaya" />
             </div>
             <div>
               <label class="label">Alamat Kantor Pusat</label>
-              <textarea class="input" rows="3">Jl. Jendral Sudirman No. 45, Jakarta Selatan</textarea>
+              <textarea v-model="settings.company_address" class="input" rows="3" placeholder="Alamat lengkap..."></textarea>
             </div>
             <div>
               <label class="label">NPWP</label>
-              <input type="text" class="input" value="01.234.567.8-901.000" />
+              <input type="text" v-model="settings.company_npwp" class="input" placeholder="01.234.567.8-901.000" />
             </div>
-            <button class="btn btn-primary mt-4" @click="showSaveToast">Simpan Perusahaan</button>
+            <button class="btn btn-primary mt-4" @click="saveSettings" :disabled="saving">
+              {{ saving ? 'Menyimpan...' : 'Simpan Perusahaan' }}
+            </button>
           </div>
         </div>
 
@@ -109,14 +111,14 @@
           <h3 class="text-lg font-bold text-gray-800 mb-6">Preferensi Sistem</h3>
           <div class="space-y-6 max-w-md">
             <label class="flex items-center gap-3">
-              <input type="checkbox" class="rounded text-blue-600 w-5 h-5" checked />
+              <input type="checkbox" v-model="settings.pref_low_stock_email" true-value="1" false-value="0" class="rounded text-blue-600 w-5 h-5" />
               <div>
                 <p class="font-medium text-gray-800">Peringatan Stok Menipis (Email)</p>
                 <p class="text-xs text-gray-500">Kirim notifikasi email saat stok barang menyentuh ambang batas minimum.</p>
               </div>
             </label>
             <label class="flex items-center gap-3">
-              <input type="checkbox" class="rounded text-blue-600 w-5 h-5" checked />
+              <input type="checkbox" v-model="settings.pref_barcode_validation" true-value="1" false-value="0" class="rounded text-blue-600 w-5 h-5" />
               <div>
                 <p class="font-medium text-gray-800">Validasi Barcode Otomatis</p>
                 <p class="text-xs text-gray-500">Wajibkan scan barcode pada proses Inbound & Outbound.</p>
@@ -124,13 +126,15 @@
             </label>
             <div class="pt-4 border-t border-gray-100">
               <label class="label">Zona Waktu (Timezone)</label>
-              <select class="input">
-                <option>Asia/Jakarta (WIB)</option>
-                <option>Asia/Makassar (WITA)</option>
-                <option>Asia/Jayapura (WIT)</option>
+              <select v-model="settings.timezone" class="input">
+                <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                <option value="Asia/Makassar">Asia/Makassar (WITA)</option>
+                <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
               </select>
             </div>
-            <button class="btn btn-primary mt-4" @click="showSaveToast">Simpan Preferensi</button>
+            <button class="btn btn-primary mt-4" @click="saveSettings" :disabled="saving">
+              {{ saving ? 'Menyimpan...' : 'Simpan Preferensi' }}
+            </button>
           </div>
         </div>
 
@@ -140,9 +144,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationStore } from '../stores/notification'
+import { settingAPI } from '../services/api'
 import BreadCrumb from '../components/common/BreadCrumb.vue'
 import {
   UserCircleIcon,
@@ -162,8 +167,45 @@ const tabs = [
 ]
 
 const activeTab = ref('profile')
+const saving = ref(false)
 
-function showSaveToast() {
-  notify.success('Pengaturan berhasil disimpan!')
+const settings = ref({
+  company_name: 'PT Logistik Nusantara Jaya',
+  company_address: 'Jl. Jendral Sudirman No. 45, Jakarta Selatan',
+  company_npwp: '01.234.567.8-901.000',
+  pref_low_stock_email: '1',
+  pref_barcode_validation: '1',
+  timezone: 'Asia/Jakarta'
+})
+
+async function fetchSettings() {
+  try {
+    const res = await settingAPI.index()
+    const data = res.data?.data || res.data || {}
+    // Merge remote settings into local state
+    for (const key in data) {
+      if (settings.value.hasOwnProperty(key)) {
+        settings.value[key] = data[key]
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load settings', e)
+  }
 }
+
+async function saveSettings() {
+  saving.value = true
+  try {
+    await settingAPI.update(settings.value)
+    notify.success('Pengaturan berhasil disimpan!')
+  } catch (e) {
+    notify.error('Gagal menyimpan pengaturan')
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(() => {
+  fetchSettings()
+})
 </script>

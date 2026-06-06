@@ -48,6 +48,21 @@ const routes = [
         component: () => import('../views/Stock.vue')
       },
       {
+        path: 'stock-opnames',
+        name: 'StockOpnames',
+        component: () => import('../views/StockOpnames.vue')
+      },
+      {
+        path: 'stock-opnames/:id',
+        name: 'StockOpnameDetail',
+        component: () => import('../views/StockOpnameDetail.vue')
+      },
+      {
+        path: 'transfers',
+        name: 'Transfers',
+        component: () => import('../views/Transfers.vue')
+      },
+      {
         path: 'planograms',
         name: 'Planograms',
         component: () => import('../views/Planograms.vue')

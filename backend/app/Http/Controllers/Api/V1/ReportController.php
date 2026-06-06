@@ -106,6 +106,44 @@ class ReportController extends Controller
         return response()->json($data);
     }
 
+    public function valuation(Request $request): JsonResponse
+    {
+        $warehouseId = $request->warehouse_id;
+
+        $valuation = DB::table('inventory as i')
+            ->join('products as p', 'i.product_id', '=', 'p.id')
+            ->select(
+                DB::raw('SUM(i.quantity) as total_quantity'),
+                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as total_value'),
+                DB::raw('COUNT(DISTINCT p.id) as total_products')
+            )
+            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+            ->where('i.quantity', '>', 0)
+            ->first();
+
+        $byCategory = DB::table('inventory as i')
+            ->join('products as p', 'i.product_id', '=', 'p.id')
+            ->leftJoin('product_categories as c', 'p.category_id', '=', 'c.id')
+            ->select(
+                DB::raw('COALESCE(c.name, \'Tanpa Kategori\') as category'),
+                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as value'),
+                DB::raw('SUM(i.quantity) as quantity')
+            )
+            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+            ->where('i.quantity', '>', 0)
+            ->groupBy('c.name')
+            ->get();
+
+        return response()->json([
+            'data' => [
+                'total_quantity' => $valuation->total_quantity ?? 0,
+                'total_value' => $valuation->total_value ?? 0,
+                'total_products' => $valuation->total_products ?? 0,
+                'by_category' => $byCategory
+            ]
+        ]);
+    }
+
     public function export(Request $request): JsonResponse
     {
         // Returns URL to exported file (handled asynchronously via queue)

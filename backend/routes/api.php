@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\AuditLogController;
+use App\Http\Controllers\Api\V1\SettingController;
 
 // Public routes
 Route::prefix('v1')->group(function () {
@@ -36,6 +37,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::put('/password', [AuthController::class, 'updatePassword']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    
+    Route::get('/settings', [SettingController::class, 'index']);
+    Route::put('/settings', [SettingController::class, 'update']);
 
     Route::apiResource('users', UserController::class);
     Route::get('/roles', [UserController::class, 'roles']);
@@ -99,6 +103,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/reports/aging', [ReportController::class, 'aging']);
     Route::get('/reports/expiry', [ReportController::class, 'expiry']);
     Route::get('/reports/utilization', [ReportController::class, 'utilization']);
+    Route::get('/reports/valuation', [ReportController::class, 'valuation']);
     Route::get('/reports/activity', [ReportController::class, 'activity']);
     Route::post('/reports/export', [ReportController::class, 'export']);
 

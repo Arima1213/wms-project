@@ -81,6 +81,8 @@ const menuItems = [
   { to: '/inbounds', label: 'Barang Masuk', icon: ArrowUpCircleIcon },
   { to: '/outbounds', label: 'Barang Keluar', icon: ArrowDownCircleIcon },
   { to: '/stock', label: 'Stok', icon: ClipboardDocumentListIcon },
+  { to: '/stock-opnames', label: 'Stock Opname', icon: ClipboardDocumentListIcon },
+  { to: '/transfers', label: 'Transfer Stok', icon: ArrowUpCircleIcon },
   { to: '/planograms', label: 'Planogram', icon: MapIcon },
   { to: '/reports', label: 'Laporan', icon: ChartBarIcon },
   { to: '/settings', label: 'Pengaturan', icon: Cog6ToothIcon },
