@@ -9,11 +9,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlanogramSnapshot extends Model
 {
     use HasFactory;
-    public $timestamps = false;
 
-    protected $fillable = ['planogram_id', 'version', 'canvas_data', 'created_by', 'change_summary', 'created_at'];
-    protected $casts = ['canvas_data' => 'array', 'created_at' => 'datetime'];
+    protected $fillable = [
+        'planogram_id', 'version', 'canvas_data',
+        'change_summary', 'created_by',
+    ];
 
-    public function planogram(): BelongsTo { return $this->belongsTo(Planogram::class); }
-    public function createdBy(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
+    protected $casts = [
+        'canvas_data' => 'array',
+    ];
+
+    public function planogram(): BelongsTo
+    {
+        return $this->belongsTo(Planogram::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

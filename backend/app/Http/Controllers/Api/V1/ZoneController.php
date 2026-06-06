@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\WarehouseZone;
+use App\Models\Zone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -11,7 +11,7 @@ class ZoneController extends Controller
 {
     public function index(string|int $warehouse): JsonResponse
     {
-        $zones = WarehouseZone::where('warehouse_id', $warehouse)
+        $zones = Zone::where('warehouse_id', $warehouse)
             ->withCount('racks')
             ->orderBy('sort_order')
             ->paginate(50);
@@ -23,25 +23,25 @@ class ZoneController extends Controller
         $request->validate([
             'code' => 'required|string|max:10',
             'name' => 'required|string|max:100',
+            'zone_type' => 'nullable|in:fast_moving,slow_moving,heavy,cold,hazmat',
             'color' => 'nullable|string|max:7',
-            'min_temp' => 'nullable|numeric',
-            'max_temp' => 'nullable|numeric',
-            'min_humidity' => 'nullable|integer',
-            'max_humidity' => 'nullable|integer',
-            'allowed_categories' => 'nullable|array',
+            'temperature_range' => 'nullable|array',
+            'humidity_range' => 'nullable|array',
+            'allowed_product_types' => 'nullable|array',
+            'description' => 'nullable|string',
             'sort_order' => 'nullable|integer',
         ]);
 
-        $zone = WarehouseZone::create([
+        $zone = Zone::create([
             'warehouse_id' => $warehouse,
             'code' => $request->code,
             'name' => $request->name,
+            'zone_type' => $request->zone_type ?? 'fast_moving',
             'color' => $request->color ?? '#3B82F6',
-            'min_temp' => $request->min_temp,
-            'max_temp' => $request->max_temp,
-            'min_humidity' => $request->min_humidity,
-            'max_humidity' => $request->max_humidity,
-            'allowed_categories' => $request->allowed_categories,
+            'temperature_range' => $request->temperature_range,
+            'humidity_range' => $request->humidity_range,
+            'allowed_product_types' => $request->allowed_product_types,
+            'description' => $request->description,
             'sort_order' => $request->sort_order ?? 0,
             'is_active' => true,
         ]);
@@ -51,7 +51,7 @@ class ZoneController extends Controller
 
     public function show(string|int $warehouse, string|int $zone): JsonResponse
     {
-        $zone = WarehouseZone::where('warehouse_id', $warehouse)
+        $zone = Zone::where('warehouse_id', $warehouse)
             ->where('id', $zone)
             ->with('racks')
             ->firstOrFail();
@@ -60,23 +60,24 @@ class ZoneController extends Controller
 
     public function update(Request $request, string|int $warehouse, string|int $zone): JsonResponse
     {
-        $zone = WarehouseZone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
+        $zone = Zone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
 
         $request->validate([
             'code' => 'sometimes|required|string|max:10',
             'name' => 'sometimes|required|string|max:100',
+            'zone_type' => 'nullable|in:fast_moving,slow_moving,heavy,cold,hazmat',
             'color' => 'nullable|string|max:7',
-            'min_temp' => 'nullable|numeric',
-            'max_temp' => 'nullable|numeric',
-            'min_humidity' => 'nullable|integer',
-            'max_humidity' => 'nullable|integer',
-            'allowed_categories' => 'nullable|array',
+            'temperature_range' => 'nullable|array',
+            'humidity_range' => 'nullable|array',
+            'allowed_product_types' => 'nullable|array',
+            'description' => 'nullable|string',
             'sort_order' => 'nullable|integer',
         ]);
 
         $zone->update($request->only([
-            'code', 'name', 'color', 'min_temp', 'max_temp',
-            'min_humidity', 'max_humidity', 'allowed_categories', 'sort_order',
+            'code', 'name', 'zone_type', 'color',
+            'temperature_range', 'humidity_range', 'allowed_product_types',
+            'description', 'sort_order',
         ]));
 
         return response()->json(['data' => $zone]);
@@ -84,21 +85,21 @@ class ZoneController extends Controller
 
     public function destroy(string|int $warehouse, string|int $zone): JsonResponse
     {
-        $zone = WarehouseZone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
+        $zone = Zone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
         $zone->delete();
         return response()->json(['message' => 'Zone deleted']);
     }
 
-    public function activate(string|int $warehouse, string|int $zone): JsonResponse
+    public function activate(string|int $zone): JsonResponse
     {
-        $zone = WarehouseZone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
+        $zone = Zone::findOrFail($zone);
         $zone->update(['is_active' => true]);
         return response()->json(['data' => $zone]);
     }
 
-    public function deactivate(string|int $warehouse, string|int $zone): JsonResponse
+    public function deactivate(string|int $zone): JsonResponse
     {
-        $zone = WarehouseZone::where('warehouse_id', $warehouse)->where('id', $zone)->firstOrFail();
+        $zone = Zone::findOrFail($zone);
         $zone->update(['is_active' => false]);
         return response()->json(['data' => $zone]);
     }
