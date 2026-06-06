@@ -220,23 +220,23 @@ class DatabaseSeeder extends Seeder
             foreach ($actions as $action) {
                 Permission::create([
                     'name' => "{$module}.{$action}",
-                    'guard_name' => 'web',
+                    'guard_name' => 'sanctum',
                     'group' => $module,
                 ]);
             }
         }
 
         // Super Admin — all permissions
-        $superAdmin = Role::create(['name' => 'super_admin', 'guard_name' => 'web', 'description' => 'Full system access', 'is_system' => true]);
+        $superAdmin = Role::create(['name' => 'super_admin', 'guard_name' => 'sanctum', 'description' => 'Full system access', 'is_system' => true]);
         $superAdmin->givePermissionTo(Permission::all());
 
         // Manager — most permissions except user/role/webhook management
-        $managerRole = Role::create(['name' => 'manager', 'guard_name' => 'web', 'description' => 'Warehouse manager']);
+        $managerRole = Role::create(['name' => 'manager', 'guard_name' => 'sanctum', 'description' => 'Warehouse manager']);
         $managerPerms = Permission::whereNotIn('group', ['user', 'role', 'webhook', 'setting'])->get();
         $managerRole->givePermissionTo($managerPerms);
 
         // Operator — operational permissions only
-        $operatorRole = Role::create(['name' => 'operator', 'guard_name' => 'web', 'description' => 'Warehouse operator']);
+        $operatorRole = Role::create(['name' => 'operator', 'guard_name' => 'sanctum', 'description' => 'Warehouse operator']);
         $operatorPerms = Permission::whereIn('group', ['warehouse', 'zone', 'rack', 'product', 'category', 'inbound', 'outbound', 'inventory', 'planogram', 'dashboard'])
             ->whereIn('name', function ($q) {
                 $q->select('name')->from('permissions')
@@ -260,7 +260,7 @@ class DatabaseSeeder extends Seeder
         );
 
         // Viewer — view only
-        $viewerRole = Role::create(['name' => 'viewer', 'guard_name' => 'web', 'description' => 'Read-only access']);
+        $viewerRole = Role::create(['name' => 'viewer', 'guard_name' => 'sanctum', 'description' => 'Read-only access']);
         $viewerRole->givePermissionTo(Permission::where('name', 'like', '%.view')->get());
     }
 }
