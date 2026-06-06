@@ -48,6 +48,11 @@ const routes = [
         component: () => import('../views/Planograms.vue')
       },
       {
+        path: 'planograms/:warehouseId',
+        name: 'PlanogramEditor',
+        component: () => import('../views/PlanogramEditor.vue')
+      },
+      {
         path: 'reports',
         name: 'Reports',
         component: () => import('../views/Reports.vue')
