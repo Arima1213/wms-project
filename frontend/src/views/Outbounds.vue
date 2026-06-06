@@ -53,7 +53,7 @@
           <router-link :to="`/outbounds/${row.id}`" class="btn btn-sm btn-ghost text-blue-600">
             Detail
           </router-link>
-          <button v-if="row.status === 'ready'" @click="ship(row)" class="btn btn-sm btn-ghost text-emerald-600">
+          <button v-if="row.status === 'pending' || row.status === 'picking'" @click="ship(row)" class="btn btn-sm btn-ghost text-emerald-600">
             Kirim (Ship)
           </button>
         </div>
