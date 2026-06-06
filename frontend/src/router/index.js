@@ -28,14 +28,29 @@ const routes = [
         component: () => import('../views/Warehouses.vue')
       },
       {
+        path: 'products/:id',
+        name: 'ProductDetail',
+        component: () => import('../views/ProductDetail.vue')
+      },
+      {
         path: 'products',
         name: 'Products',
         component: () => import('../views/Products.vue')
       },
       {
+        path: 'inbounds/:id',
+        name: 'InboundDetail',
+        component: () => import('../views/InboundDetail.vue')
+      },
+      {
         path: 'inbounds',
         name: 'Inbounds',
         component: () => import('../views/Inbounds.vue')
+      },
+      {
+        path: 'outbounds/:id',
+        name: 'OutboundDetail',
+        component: () => import('../views/OutboundDetail.vue')
       },
       {
         path: 'outbounds',

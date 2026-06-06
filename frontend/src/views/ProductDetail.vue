@@ -107,7 +107,7 @@
             Ketersediaan Stok
           </h3>
           <div class="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <p class="text-4xl font-bold text-gray-800">0</p>
+            <p class="text-4xl font-bold text-gray-800">{{ totalStock }}</p>
             <p class="text-sm text-gray-500 mt-1">Total Stok Tersedia</p>
             <router-link :to="`/stock?product_id=${product?.id}`" class="btn btn-sm btn-outline mt-4">
               Lihat Rincian Stok
@@ -127,18 +127,60 @@
       </div>
     </div>
 
-    <Modal v-model="showEditModal" title="Edit Produk">
-      <div class="text-center py-4 text-gray-500">
-        Fitur edit menggunakan modal utama di Products.vue, ini placeholder untuk detail view.
+    <Modal v-model="showEditModal" title="Edit Produk" size="lg">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Nama Produk <span class="text-red-500">*</span></label>
+          <input v-model="editForm.name" type="text" class="input" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">SKU</label>
+          <input v-model="editForm.sku" type="text" class="input" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Barcode</label>
+          <input v-model="editForm.barcode" type="text" class="input" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Tipe Produk</label>
+          <select v-model="editForm.product_type" class="input">
+            <option value="raw_material">Raw Material</option>
+            <option value="packaging">Packaging</option>
+            <option value="finished_goods">Finished Goods</option>
+            <option value="spare_part">Spare Part</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="label">Deskripsi</label>
+          <textarea v-model="editForm.description" rows="2" class="input resize-none"></textarea>
+        </div>
+        <div class="col-span-1">
+          <label class="label">Min Stock</label>
+          <input v-model.number="editForm.min_stock" type="number" class="input" />
+        </div>
+        <div class="col-span-1">
+          <label class="label">Max Stock</label>
+          <input v-model.number="editForm.max_stock" type="number" class="input" />
+        </div>
       </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button @click="showEditModal = false" class="btn btn-outline">Batal</button>
+          <button @click="saveEdit" class="btn btn-primary" :disabled="saving">
+            {{ saving ? 'Menyimpan...' : 'Simpan' }}
+          </button>
+        </div>
+      </template>
     </Modal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductStore } from '../stores/product'
+import { useNotificationStore } from '../stores/notification'
+import { inventoryAPI } from '../services/api'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import Modal from '../components/common/Modal.vue'
 import {
@@ -152,16 +194,67 @@ import {
 const route = useRoute()
 const router = useRouter()
 const store = useProductStore()
+const notify = useNotificationStore()
 
 const product = computed(() => store.selected)
 const loading = computed(() => store.loading)
 const showEditModal = ref(false)
+const saving = ref(false)
+const totalStock = ref(0)
+
+const editForm = ref({
+  name: '', sku: '', barcode: '', product_type: '',
+  description: '', min_stock: 0, max_stock: 0
+})
+
+watch(showEditModal, (val) => {
+  if (val && product.value) {
+    editForm.value = {
+      name: product.value.name || '',
+      sku: product.value.sku || '',
+      barcode: product.value.barcode || '',
+      product_type: product.value.product_type || 'raw_material',
+      description: product.value.description || '',
+      min_stock: product.value.min_stock || 0,
+      max_stock: product.value.max_stock || 0,
+    }
+  }
+})
 
 async function fetchData() {
   await store.fetchOne(route.params.id)
 }
 
+async function fetchStock() {
+  try {
+    const res = await inventoryAPI.stock({ product_id: route.params.id })
+    const data = res.data || res
+    if (Array.isArray(data)) {
+      totalStock.value = data.reduce((sum, inv) => sum + (inv.quantity || 0), 0)
+    } else {
+      totalStock.value = data.total_quantity || 0
+    }
+  } catch (e) {
+    totalStock.value = 0
+  }
+}
+
+async function saveEdit() {
+  saving.value = true
+  try {
+    await store.update(product.value.id, editForm.value)
+    showEditModal.value = false
+    notify.success('Produk berhasil diperbarui')
+    await fetchData()
+  } catch (e) {
+    notify.error('Gagal menyimpan perubahan')
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(() => {
   fetchData()
+  fetchStock()
 })
 </script>

@@ -156,19 +156,56 @@
       @saved="fetchData" 
     />
 
-    <!-- Edit Modal placeholder -->
-    <Modal v-model="showEditModal" title="Edit Gudang">
-      <div class="text-center py-4 text-gray-500">
-        Fitur edit menggunakan modal utama di Warehouses.vue, ini placeholder untuk detail view.
+    <!-- Edit Warehouse Modal -->
+    <Modal v-model="showEditModal" title="Edit Gudang" size="lg">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kode Gudang</label>
+          <input v-model="editForm.code" type="text" class="input" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Tipe Gudang</label>
+          <select v-model="editForm.warehouse_type" class="input">
+            <option value="reguler">Reguler</option>
+            <option value="cold_storage">Cold Storage</option>
+            <option value="bonded">Bonded</option>
+            <option value="konsinyasi">Konsinyasi</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="label">Nama Gudang <span class="text-red-500">*</span></label>
+          <input v-model="editForm.name" type="text" class="input" />
+        </div>
+        <div class="col-span-2">
+          <label class="label">Alamat Lengkap</label>
+          <textarea v-model="editForm.address" rows="2" class="input resize-none"></textarea>
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kota</label>
+          <input v-model="editForm.city" type="text" class="input" />
+        </div>
+        <div class="col-span-2 sm:col-span-1">
+          <label class="label">Kapasitas (m²)</label>
+          <input v-model.number="editForm.capacity_m2" type="number" class="input" />
+        </div>
       </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button @click="showEditModal = false" class="btn btn-outline">Batal</button>
+          <button @click="saveEdit" class="btn btn-primary" :disabled="savingEdit">
+            {{ savingEdit ? 'Menyimpan...' : 'Simpan' }}
+          </button>
+        </div>
+      </template>
     </Modal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWarehouseStore } from '../stores/warehouse'
+import { useNotificationStore } from '../stores/notification'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import Modal from '../components/common/Modal.vue'
 import ZoneModal from '../components/warehouse/ZoneModal.vue'
@@ -183,13 +220,33 @@ import { id } from 'date-fns/locale'
 const route = useRoute()
 const router = useRouter()
 const store = useWarehouseStore()
+const notify = useNotificationStore()
 
 const warehouse = computed(() => store.selected)
 const loading = computed(() => store.loading)
 const showEditModal = ref(false)
+const savingEdit = ref(false)
 
 const showZoneModal = ref(false)
 const selectedZone = ref(null)
+
+const editForm = ref({
+  code: '', name: '', warehouse_type: 'reguler',
+  address: '', city: '', capacity_m2: null
+})
+
+watch(showEditModal, (val) => {
+  if (val && warehouse.value) {
+    editForm.value = {
+      code: warehouse.value.code || '',
+      name: warehouse.value.name || '',
+      warehouse_type: warehouse.value.warehouse_type || 'reguler',
+      address: warehouse.value.address || '',
+      city: warehouse.value.city || '',
+      capacity_m2: warehouse.value.capacity_m2 || null,
+    }
+  }
+})
 
 const zones = computed(() => warehouse.value?.zones || [])
 const racks = computed(() => {
@@ -236,6 +293,20 @@ function openCreateZone() {
 function openEditZone(zone) {
   selectedZone.value = zone
   showZoneModal.value = true
+}
+
+async function saveEdit() {
+  savingEdit.value = true
+  try {
+    await store.update(warehouse.value.id, editForm.value)
+    showEditModal.value = false
+    notify.success('Gudang berhasil diperbarui')
+    await fetchData()
+  } catch (e) {
+    notify.error('Gagal menyimpan perubahan')
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 function formatDate(dateStr) {

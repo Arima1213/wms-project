@@ -93,10 +93,15 @@
     </div>
 
     <!-- Modals Placeholders -->
-    <Modal v-model="showTransferModal" title="Transfer Stok Antar Lokasi" size="lg">
-      <div class="text-center py-8 text-gray-500">
-        <p>Fitur pemindahan stok akan tersedia melalui modul Transfer Antar Gudang.</p>
-        <button @click="showTransferModal = false" class="btn btn-outline mt-4">Tutup</button>
+    <Modal v-model="showTransferModal" title="Transfer Stok Antar Lokasi" size="md">
+      <div class="text-center py-8">
+        <ArrowsRightLeftIcon class="w-12 h-12 text-blue-400 mx-auto mb-3" />
+        <p class="text-gray-600 mb-2">Modul Transfer Antar Gudang sudah tersedia.</p>
+        <p class="text-sm text-gray-400 mb-4">Anda dapat membuat pengajuan transfer, menyetujui, dan mengeksekusi perpindahan stok.</p>
+        <div class="flex justify-center gap-3">
+          <button @click="showTransferModal = false" class="btn btn-outline">Tutup</button>
+          <button @click="showTransferModal = false; router.push('/transfers')" class="btn btn-primary">Buka Halaman Transfer</button>
+        </div>
       </div>
     </Modal>
 
@@ -198,7 +203,26 @@ function handleSearch(query) {
 }
 
 function exportData() {
-  alert('Fitur export sedang disiapkan')
+  // Generate CSV from current stock data
+  if (!store.stocks || store.stocks.length === 0) {
+    notify.error('Tidak ada data stok untuk di-export')
+    return
+  }
+  const headers = ['Produk', 'SKU', 'Gudang', 'Batch', 'Kuantitas']
+  const rows = store.stocks.map(s => [
+    s.product?.name || s.product_name || '',
+    s.product?.sku || s.sku || '',
+    s.warehouse?.name || s.warehouse_name || '',
+    s.batch_number || '',
+    s.quantity || 0
+  ])
+  const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `stok_${new Date().toISOString().slice(0,10)}.csv`
+  link.click()
+  notify.success('File CSV berhasil diunduh')
 }
 
 async function submitAdjustment() {
@@ -209,8 +233,11 @@ async function submitAdjustment() {
     notify.success('Stock Opname (Draft) berhasil dibuat!')
     showAdjustModal.value = false
     adjustForm.value = { warehouse_id: '', notes: '' }
-    // Could route to opname detail page if implemented, e.g.:
-    // router.push(`/stock-opnames/${res.data.id}`)
+    // Navigate to opname detail page
+    const opnameId = res.data?.id || res.id
+    if (opnameId) {
+      router.push(`/stock-opnames/${opnameId}`)
+    }
   } catch (e) {
     notify.error('Gagal membuat Stock Opname')
   } finally {
