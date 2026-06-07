@@ -20,7 +20,15 @@ class PlanogramController extends Controller
         $planogram = $this->getPlanogram($warehouseModel->id);
 
         if (!$planogram) {
-            return response()->json(['data' => null, 'message' => 'Planogram not found for this warehouse'], 404);
+            $planogram = new Planogram([
+                'warehouse_id' => $warehouseModel->id,
+                'canvas_width' => 5000,
+                'canvas_height' => 3000,
+                'grid_size' => 50,
+                'version' => '1.0',
+                'canvas_data' => ['zones' => [], 'items' => []],
+            ]);
+            return response()->json(['data' => $planogram], 200);
         }
 
         $planogram->load('createdBy:id,name');
