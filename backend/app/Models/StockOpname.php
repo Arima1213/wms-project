@@ -12,14 +12,19 @@ class StockOpname extends Model
     use HasFactory;
 
     protected $fillable = [
-        'opname_number', 'warehouse_id', 'user_id', 'status', 'opname_type',
-        'opname_date', 'submitted_at', 'approved_at', 'approved_by', 'notes',
+        'opname_number', 'warehouse_id', 'zone_id', 'type', 'status',
+        'start_date', 'end_date', 'notes', 'created_by', 'approved_by', 'approved_at',
     ];
 
-    protected $casts = ['opname_date' => 'date', 'submitted_at' => 'datetime', 'approved_at' => 'datetime'];
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'approved_at' => 'datetime'
+    ];
 
     public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function zone(): BelongsTo { return $this->belongsTo(Zone::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function approvedByUser(): BelongsTo { return $this->belongsTo(User::class, 'approved_by'); }
     public function items(): HasMany { return $this->hasMany(StockOpnameItem::class); }
 }

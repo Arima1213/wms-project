@@ -47,7 +47,7 @@ class TransferController extends Controller
                 'transfer_number' => 'TRF-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
                 'source_warehouse_id' => $validated['source_warehouse_id'],
                 'dest_warehouse_id' => $validated['dest_warehouse_id'],
-                'user_id' => $request->user()->id,
+                'created_by' => $request->user()->id,
                 'status' => 'pending',
                 'reason' => $validated['reason'] ?? null,
                 'notes' => $validated['notes'] ?? null,

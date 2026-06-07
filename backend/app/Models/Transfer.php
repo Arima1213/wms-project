@@ -12,16 +12,19 @@ class Transfer extends Model
     use HasFactory;
 
     protected $fillable = [
-        'transfer_number', 'source_warehouse_id', 'dest_warehouse_id', 'user_id',
-        'status', 'reason', 'approved_at', 'approved_by', 'received_at', 'received_by', 'notes',
+        'transfer_number', 'source_warehouse_id', 'dest_warehouse_id', 'created_by',
+        'status', 'reason', 'notes', 'expected_date', 'completed_date', 'approved_by', 'approved_at',
     ];
 
-    protected $casts = ['approved_at' => 'datetime', 'received_at' => 'datetime'];
+    protected $casts = [
+        'expected_date' => 'date',
+        'completed_date' => 'date',
+        'approved_at' => 'datetime'
+    ];
 
     public function sourceWarehouse(): BelongsTo { return $this->belongsTo(Warehouse::class, 'source_warehouse_id'); }
     public function destWarehouse(): BelongsTo { return $this->belongsTo(Warehouse::class, 'dest_warehouse_id'); }
-    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function user(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function approvedByUser(): BelongsTo { return $this->belongsTo(User::class, 'approved_by'); }
-    public function receivedByUser(): BelongsTo { return $this->belongsTo(User::class, 'received_by'); }
     public function items(): HasMany { return $this->hasMany(TransferItem::class); }
 }

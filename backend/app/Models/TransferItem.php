@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TransferItem extends Model
 {
     use HasFactory;
-    protected $fillable = ['transfer_id', 'product_id', 'quantity', 'batch_number', 'source_slot_id', 'dest_slot_id'];
-    protected $casts = ['quantity' => 'decimal:3'];
+    protected $fillable = ['transfer_id', 'product_id', 'quantity', 'received_qty', 'batch_number', 'source_slot_id', 'dest_slot_id', 'notes'];
+    protected $casts = ['quantity' => 'decimal:4', 'received_qty' => 'decimal:4'];
     public function transfer(): BelongsTo { return $this->belongsTo(Transfer::class); }
     public function product(): BelongsTo { return $this->belongsTo(Product::class); }
     public function sourceSlot(): BelongsTo { return $this->belongsTo(RackSlot::class, 'source_slot_id'); }

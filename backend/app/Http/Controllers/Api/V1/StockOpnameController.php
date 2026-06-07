@@ -48,8 +48,10 @@ class StockOpnameController extends Controller
         $opname = StockOpname::create([
             'opname_number' => $validated['opname_number'] ?? 'SO-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
             'warehouse_id' => $validated['warehouse_id'],
-            'user_id' => $request->user()->id,
+            'created_by' => $request->user()->id,
             'status' => 'draft',
+            'type' => $request->type ?? 'full',
+            'start_date' => $request->start_date ?? now()->toDateString(),
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -77,6 +79,7 @@ class StockOpnameController extends Controller
             'items.*.system_qty' => 'required|numeric',
             'items.*.actual_qty' => 'required|numeric',
             'items.*.difference_qty' => 'required|numeric',
+            'items.*.slot_id' => 'nullable|exists:rack_slots,id',
         ]);
 
         DB::beginTransaction();
@@ -89,7 +92,16 @@ class StockOpnameController extends Controller
                 // Clear existing items and recreate
                 $opname->items()->delete();
                 foreach ($validated['items'] as $item) {
-                    $opname->items()->create($item);
+                    $opname->items()->create([
+                        'product_id' => $item['product_id'],
+                        'slot_id' => $item['slot_id'] ?? null,
+                        'system_qty' => $item['system_qty'],
+                        'counted_qty' => $item['actual_qty'],
+                        'variance' => $item['difference_qty'],
+                        'variance_status' => $item['difference_qty'] == 0 ? 'match' : ($item['difference_qty'] > 0 ? 'over' : 'short'),
+                        'counted_by' => $request->user()->id,
+                        'counted_at' => now(),
+                    ]);
                 }
             }
             DB::commit();
