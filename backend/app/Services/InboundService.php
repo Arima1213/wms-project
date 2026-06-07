@@ -39,12 +39,12 @@ class InboundService
             $inbound->loadMissing('items');
 
             foreach ($inbound->items as $item) {
-                $item->update(['received_qty' => $item->qty, 'received_at' => now()]);
+                $item->update(['received_qty' => $item->expected_qty, 'received_at' => now()]);
 
                 $this->inventoryService->receiveStock(
                     $item->product_id,
                     $inbound->warehouse_id,
-                    $item->qty,
+                    $item->expected_qty,
                     $userId,
                     [
                         'batch_number' => $item->batch_number,

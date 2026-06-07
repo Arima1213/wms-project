@@ -31,9 +31,8 @@ class TransferService
         DB::beginTransaction();
         try {
             $transfer->update([
-                'status' => 'executed',
-                'received_at' => now(),
-                'received_by' => $userId,
+                'status' => 'completed',
+                'completed_date' => now()->toDateString(),
             ]);
 
             $transfer->loadMissing('items');

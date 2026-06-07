@@ -38,14 +38,14 @@ class StockOpnameService
             $opname->loadMissing('items');
 
             foreach ($opname->items as $item) {
-                // difference_qty = actual_qty - system_qty
-                // e.g. system=10, actual=12 => diff=2 (we need to ADJ+ 2)
-                // e.g. system=10, actual=8 => diff=-2 (we need to ADJ- 2)
-                if ($item->difference_qty != 0) {
+                // variance = actual_qty - system_qty
+                // e.g. system=10, actual=12 => variance=2 (we need to ADJ+ 2)
+                // e.g. system=10, actual=8 => variance=-2 (we need to ADJ- 2)
+                if ($item->variance != 0) {
                     $this->inventoryService->adjustStock(
                         $item->product_id,
                         $opname->warehouse_id,
-                        $item->difference_qty,
+                        $item->variance,
                         $userId,
                         [
                             'reference_type' => 'App\Models\StockOpname',

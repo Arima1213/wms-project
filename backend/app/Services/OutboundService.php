@@ -39,12 +39,12 @@ class OutboundService
             $outbound->loadMissing('items');
 
             foreach ($outbound->items as $item) {
-                $item->update(['picked_qty' => $item->qty]);
+                $item->update(['picked_qty' => $item->ordered_qty, 'shipped_qty' => $item->ordered_qty, 'status' => 'shipped']);
 
                 $this->inventoryService->issueStock(
                     $item->product_id,
                     $outbound->warehouse_id,
-                    $item->qty,
+                    $item->ordered_qty,
                     $userId,
                     [
                         'reference_type' => 'App\Models\Outbound',
