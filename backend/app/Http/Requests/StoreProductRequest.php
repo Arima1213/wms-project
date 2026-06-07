@@ -30,7 +30,7 @@ class StoreProductRequest extends FormRequest
             'max_stock' => ['nullable', 'numeric', 'min:0'],
             'reorder_point' => ['nullable', 'numeric', 'min:0'],
             'safety_stock' => ['nullable', 'numeric', 'min:0'],
-            'product_type' => ['nullable', 'string', Rule::in(['raw_material', 'finished_goods', 'packaging', 'spare_part'])],
+            'product_type' => ['nullable', 'string', Rule::in(['standard', 'oversized', 'hazmat', 'cold'])],
             'track_batch' => ['nullable', 'boolean'],
             'track_expiry' => ['nullable', 'boolean'],
             'hs_code' => ['nullable', 'string', 'max:50'],

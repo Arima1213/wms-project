@@ -91,10 +91,10 @@
         <div class="col-span-2 sm:col-span-1">
           <label class="label">Tipe Produk</label>
           <select v-model="form.product_type" class="input">
-            <option value="raw_material">Raw Material</option>
-            <option value="packaging">Packaging</option>
-            <option value="finished_goods">Finished Goods</option>
-            <option value="spare_part">Spare Part</option>
+            <option value="standard">Standard</option>
+            <option value="oversized">Oversized</option>
+            <option value="hazmat">Hazmat</option>
+            <option value="cold">Cold Storage</option>
           </select>
         </div>
         <div class="col-span-2">
@@ -200,7 +200,7 @@ const categories = ref([])
 
 const form = ref({
   code: '', sku: '', barcode: '', name: '', description: '',
-  product_type: 'raw_material', category_id: null, unit_id: null,
+  product_type: 'standard', category_id: null, unit_id: null,
   length_cm: null, width_cm: null, height_cm: null, weight_kg: null,
   track_batch: false, track_expiry: false, is_active: true
 })

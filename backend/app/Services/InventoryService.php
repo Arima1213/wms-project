@@ -130,6 +130,8 @@ class InventoryService
         ]);
 
         return $inventory;
+    }
+
     /**
      * Transfer stock between warehouses and log a TR transaction.
      *
