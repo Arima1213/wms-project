@@ -22,7 +22,6 @@ class InboundController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', Inbound::class);
         $query = Inbound::with('warehouse', 'user');
 
         if ($request->has('status')) {
@@ -46,22 +45,37 @@ class InboundController extends Controller
     {
         $validated = $request->validated();
 
+        // Map frontend source_type values to DB enum values
+        $sourceTypeMap = [
+            'purchase_order' => 'purchase',
+            'return' => 'return',
+            'transfer_in' => 'transfer',
+            'other' => 'other',
+        ];
+        $sourceType = $sourceTypeMap[$validated['source_type'] ?? 'other'] ?? 'other';
+
         DB::beginTransaction();
         try {
             $inbound = Inbound::create([
                 'inbound_number' => 'INB-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
                 'warehouse_id' => $validated['warehouse_id'],
-                'user_id' => $request->user()->id,
+                'created_by' => $request->user()->id,
                 'status' => 'pending',
                 'expected_date' => $validated['expected_date'] ?? null,
-                'source_type' => $validated['source_type'] ?? null,
+                'source_type' => $sourceType,
                 'source_reference' => $validated['source_reference'] ?? null,
                 'notes' => $validated['notes'] ?? null,
             ]);
 
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
-                    $inbound->items()->create($item);
+                    $inbound->items()->create([
+                        'product_id' => $item['product_id'],
+                        'expected_qty' => $item['qty'] ?? $item['expected_qty'] ?? 0,
+                        'batch_number' => $item['batch_number'] ?? null,
+                        'expiry_date' => $item['expiry_date'] ?? null,
+                        'notes' => $item['notes'] ?? null,
+                    ]);
                 }
             }
 

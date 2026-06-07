@@ -15,7 +15,7 @@ class StoreInboundRequest extends FormRequest
     {
         return [
             'warehouse_id' => 'required|exists:warehouses,id',
-            'source_type' => 'nullable|string|max:100',
+            'source_type' => 'nullable|string',
             'source_reference' => 'nullable|string|max:100',
             'expected_date' => 'nullable|date',
             'notes' => 'nullable|string',

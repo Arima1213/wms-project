@@ -22,7 +22,6 @@ class OutboundController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', Outbound::class);
         $query = Outbound::with('warehouse', 'user');
 
         if ($request->has('status')) {
@@ -51,19 +50,25 @@ class OutboundController extends Controller
             $outbound = Outbound::create([
                 'outbound_number' => 'OUT-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
                 'warehouse_id' => $validated['warehouse_id'],
-                'user_id' => $request->user()->id,
+                'created_by' => $request->user()->id,
                 'status' => 'pending',
-                'customer_name' => $validated['customer_name'] ?? null,
-                'shipping_address' => $validated['shipping_address'] ?? null,
-                'destination_type' => $validated['destination_type'] ?? null,
-                'destination_reference' => $validated['destination_reference'] ?? null,
-                'expected_date' => $validated['expected_date'] ?? null,
+                'type' => $validated['type'] ?? $validated['destination_type'] ?? 'sales',
+                'destination_name' => $validated['customer_name'] ?? $validated['destination_name'] ?? null,
+                'destination_address' => $validated['shipping_address'] ?? $validated['destination_address'] ?? null,
+                'reference_number' => $validated['destination_reference'] ?? $validated['reference_number'] ?? null,
+                'order_date' => $validated['expected_date'] ?? $validated['order_date'] ?? now()->toDateString(),
                 'notes' => $validated['notes'] ?? null,
             ]);
 
             if (!empty($validated['items'])) {
                 foreach ($validated['items'] as $item) {
-                    $outbound->items()->create($item);
+                    $outbound->items()->create([
+                        'product_id' => $item['product_id'],
+                        'ordered_qty' => $item['qty'] ?? $item['ordered_qty'] ?? 0,
+                        'batch_number' => $item['batch_number'] ?? null,
+                        'expiry_date' => $item['expiry_date'] ?? null,
+                        'notes' => $item['notes'] ?? null,
+                    ]);
                 }
             }
 

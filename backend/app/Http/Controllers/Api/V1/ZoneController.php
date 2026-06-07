@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateZoneRequest;
 use App\Http\Resources\ZoneResource;
 use App\Services\Warehouse\ZoneService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 class ZoneController extends Controller
 {
@@ -40,21 +41,21 @@ class ZoneController extends Controller
 
     public function destroy(string|int $warehouse, string|int $zone): JsonResponse
     {
-        $this->authorize('zone.delete');
+        Gate::authorize('zone.delete');
         $this->zoneService->delete((int) $warehouse, (int) $zone);
         return response()->json(['message' => 'Zone deleted']);
     }
 
     public function activate(string|int $zone): JsonResponse
     {
-        $this->authorize('zone.update');
+        Gate::authorize('zone.update');
         $updated = $this->zoneService->activate((int) $zone);
         return response()->json(['data' => new ZoneResource($updated)]);
     }
 
     public function deactivate(string|int $zone): JsonResponse
     {
-        $this->authorize('zone.update');
+        Gate::authorize('zone.update');
         $updated = $this->zoneService->deactivate((int) $zone);
         return response()->json(['data' => new ZoneResource($updated)]);
     }

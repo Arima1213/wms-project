@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
@@ -45,7 +46,7 @@ class ProductController extends Controller
 
     public function destroy(string|int $product): JsonResponse
     {
-        $this->authorize('product.delete');
+        Gate::authorize('product.delete');
         $this->productService->delete((int) $product);
         return response()->json(['message' => 'Product deleted']);
     }

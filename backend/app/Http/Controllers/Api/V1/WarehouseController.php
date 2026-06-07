@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateWarehouseRequest;
 use App\Http\Resources\WarehouseResource;
 use App\Services\WarehouseService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
 
 class WarehouseController extends Controller
@@ -45,7 +46,7 @@ class WarehouseController extends Controller
 
     public function destroy(string|int $warehouse): JsonResponse
     {
-        $this->authorize('warehouse.delete');
+        Gate::authorize('warehouse.delete');
         $this->warehouseService->delete((int) $warehouse);
         return response()->json(['message' => 'Warehouse deleted']);
     }
