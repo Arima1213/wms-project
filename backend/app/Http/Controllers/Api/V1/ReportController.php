@@ -88,7 +88,7 @@ class ReportController extends Controller
             'warehouse' => ['id' => $w->id, 'code' => $w->code, 'name' => $w->name],
             'total_zones' => $w->zones->count(),
             'total_racks' => $w->zones->flatMap(fn($z) => $z->racks)->count(),
-            'total_slots' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots))),
+            'total_slots' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))->count(),
             'utilization' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))
                 ->filter(fn($s) => $s->status !== 'empty')->count(),
         ]);
