@@ -229,7 +229,7 @@ function openCreateModal() {
   editingId.value = null
   form.value = {
     code: '', sku: '', barcode: '', name: '', description: '',
-    product_type: 'raw_material', category_id: null, unit_id: null,
+    product_type: 'standard', category_id: null, unit_id: null,
     length_cm: null, width_cm: null, height_cm: null, weight_kg: null,
     track_batch: false, track_expiry: false, is_active: true
   }
@@ -244,7 +244,7 @@ function openEditModal(row) {
     barcode: row.barcode || '',
     name: row.name || '',
     description: row.description || '',
-    product_type: row.product_type || 'raw_material',
+    product_type: row.product_type || 'standard',
     category_id: row.category_id || null,
     unit_id: row.unit_id || null,
     length_cm: row.length_cm || null,
