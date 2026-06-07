@@ -1,7 +1,8 @@
 <template>
+  <Toast />
   <router-view />
 </template>
 
 <script setup>
-// Root app component
+import Toast from './components/common/Toast.vue'
 </script>

@@ -20,14 +20,46 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+// Notification helper
+let notify = null
+const getNotify = () => {
+  if (!notify) {
+    // Dynamic import to avoid circular dependencies and pinia init issues
+    import('../stores/notification').then((module) => {
+      notify = module.useNotificationStore()
+    })
+  }
+  return notify
+}
+
+// Pre-initialize
+getNotify()
+
 // Response interceptor
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const method = response.config.method?.toLowerCase()
+    // Auto-success for mutations
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      // Exclude some endpoints if they are too noisy, like planogram auto-save
+      if (!response.config.url.includes('/snapshot') && !response.config.url.includes('/login')) {
+        const store = getNotify()
+        if (store) store.success(response.data?.message || 'Proses berhasil diselesaikan')
+      }
+    }
+    return response.data
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('wms_token')
       localStorage.removeItem('wms_user')
       window.location.href = '/login'
+    } else {
+      const store = getNotify()
+      if (store) {
+        const msg = error.response?.data?.message || 'Terjadi kesalahan sistem, silakan coba lagi'
+        store.error(msg)
+      }
     }
     return Promise.reject(error)
   }
