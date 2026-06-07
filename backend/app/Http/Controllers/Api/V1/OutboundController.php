@@ -22,6 +22,7 @@ class OutboundController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Outbound::class);
         $query = Outbound::with('warehouse', 'user');
 
         if ($request->has('status')) {
