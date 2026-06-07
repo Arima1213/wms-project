@@ -143,8 +143,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { inboundAPI, productAPI } from '../services/api'
 import { useInboundStore } from '../stores/inbound'
+import { useProductStore } from '../stores/product'
 import { useNotificationStore } from '../stores/notification'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import Modal from '../components/common/Modal.vue'
@@ -154,6 +154,7 @@ import { id as idLocale } from 'date-fns/locale'
 
 const route = useRoute()
 const store = useInboundStore()
+const productStore = useProductStore()
 const notify = useNotificationStore()
 
 const inbound = ref(null)
@@ -175,21 +176,18 @@ function formatDate(dateStr) {
 }
 
 async function fetchProducts() {
-  try {
-    const res = await productAPI.list({ per_page: 500, is_active: 1 })
-    products.value = res.data?.data || res.data || []
-    if (Array.isArray(res)) products.value = res
-  } catch (e) { console.error(e) }
+  await productStore.fetchList({ per_page: 500, is_active: 1 })
+  products.value = productStore.products
 }
 
 async function fetchData() {
   loading.value = true
   try {
-    const res = await inboundAPI.show(route.params.id)
-    inbound.value = res.data?.data || res.data || res
+    const data = await store.fetchOne(route.params.id)
+    inbound.value = data?.data || data
     items.value = inbound.value.items ? JSON.parse(JSON.stringify(inbound.value.items)) : []
   } catch (error) {
-    notify.error('Gagal memuat detail inbound')
+    // handled by store
   } finally {
     loading.value = false
   }
@@ -232,11 +230,10 @@ async function cancelInbound() {
   if (!confirm('Batalkan inbound ini?')) return
   processing.value = true
   try {
-    await inboundAPI.cancel(inbound.value.id)
-    notify.success('Inbound dibatalkan')
+    await store.cancel(inbound.value.id)
     await fetchData()
   } catch (e) {
-    notify.error('Gagal membatalkan inbound')
+    // handled by store
   } finally {
     processing.value = false
   }

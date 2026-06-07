@@ -81,6 +81,19 @@ export const useInboundStore = defineStore('inbound', {
         notify.error(error.response?.data?.message || 'Gagal melakukan penerimaan')
         throw error
       }
+    },
+
+    async cancel(id) {
+      try {
+        const res = await inboundAPI.cancel(id)
+        const notify = useNotificationStore()
+        notify.success('Inbound dibatalkan')
+        return res
+      } catch (error) {
+        const notify = useNotificationStore()
+        notify.error(error.response?.data?.message || 'Gagal membatalkan inbound')
+        throw error
+      }
     }
   }
 })

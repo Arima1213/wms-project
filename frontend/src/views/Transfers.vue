@@ -13,12 +13,12 @@
     <!-- Data Table -->
     <DataTable
       :columns="columns"
-      :data="transfers"
-      :loading="loading"
+      :data="store.transfers"
+      :loading="store.loading"
       :searchable="true"
       search-placeholder="Cari nomor transfer..."
       :paginated="true"
-      :pagination="pagination"
+      :pagination="store.pagination"
       @page-change="handlePageChange"
       @search="handleSearch"
     >
@@ -162,8 +162,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { transferAPI, warehouseAPI, productAPI } from '../services/api'
-import { useNotificationStore } from '../stores/notification'
+import { warehouseAPI, productAPI } from '../services/api'
+import { useTransferStore } from '../stores/transfer'
 import DataTable from '../components/common/DataTable.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import BreadCrumb from '../components/common/BreadCrumb.vue'
@@ -171,7 +171,7 @@ import Modal from '../components/common/Modal.vue'
 import { useDebounce } from '../composables/useDebounce'
 import { ArrowRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
-const notify = useNotificationStore()
+const store = useTransferStore()
 
 const columns = [
   { key: 'transfer_number', label: 'No. Transfer', sortable: false },
@@ -182,12 +182,10 @@ const columns = [
 
 const filterStatus = ref('')
 const currentSearch = ref('')
-const loading = ref(false)
 const processing = ref(false)
-const transfers = ref([])
+
 const warehouses = ref([])
 const products = ref([])
-const pagination = ref({ current_page: 1, last_page: 1, total: 0, per_page: 25 })
 
 const showCreateModal = ref(false)
 const showDetailModal = ref(false)
@@ -223,32 +221,10 @@ async function fetchWarehousesAndProducts() {
 }
 
 async function fetchData(page = 1) {
-  loading.value = true
-  try {
-    const params = { page, per_page: 25 }
-    if (filterStatus.value !== '') params.status = filterStatus.value
-    if (currentSearch.value) params.search = currentSearch.value
-    
-    const res = await transferAPI.list(params)
-    const data = res.data || res
-    
-    if (Array.isArray(data)) {
-      transfers.value = data
-      pagination.value = { current_page: 1, last_page: 1, total: data.length, per_page: data.length }
-    } else {
-      transfers.value = data.data || []
-      pagination.value = {
-        current_page: data.current_page || 1,
-        last_page: data.last_page || 1,
-        total: data.total || 0,
-        per_page: data.per_page || 25
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  } finally {
-    loading.value = false
-  }
+  const params = { page, per_page: 25 }
+  if (filterStatus.value !== '') params.status = filterStatus.value
+  if (currentSearch.value) params.search = currentSearch.value
+  await store.fetchList(params)
 }
 
 function handlePageChange(page) {
@@ -276,12 +252,9 @@ function openCreateModal() {
 async function submitCreate() {
   processing.value = true
   try {
-    await transferAPI.create(form.value)
-    notify.success('Pengajuan transfer berhasil dibuat')
+    await store.create(form.value)
     showCreateModal.value = false
     fetchData()
-  } catch (e) {
-    notify.error('Gagal membuat transfer')
   } finally {
     processing.value = false
   }
@@ -289,26 +262,23 @@ async function submitCreate() {
 
 async function openDetailModal(row) {
   try {
-    const res = await transferAPI.show(row.id)
-    selectedTransfer.value = res.data?.data || res.data
+    const data = await store.fetchOne(row.id)
+    selectedTransfer.value = data?.data || data
     showDetailModal.value = true
   } catch (e) {
-    notify.error('Gagal memuat detail transfer')
+    // Error is handled in store
   }
 }
 
 async function handleAction(action) {
   processing.value = true
   try {
-    if (action === 'approve') await transferAPI.approve(selectedTransfer.value.id)
-    if (action === 'reject') await transferAPI.reject(selectedTransfer.value.id)
-    if (action === 'execute') await transferAPI.execute(selectedTransfer.value.id)
+    if (action === 'approve') await store.approve(selectedTransfer.value.id)
+    if (action === 'reject') await store.reject(selectedTransfer.value.id)
+    if (action === 'execute') await store.execute(selectedTransfer.value.id)
     
-    notify.success(`Transfer berhasil di-${action}`)
     showDetailModal.value = false
     fetchData()
-  } catch (e) {
-    notify.error(`Gagal memproses aksi ${action}`)
   } finally {
     processing.value = false
   }

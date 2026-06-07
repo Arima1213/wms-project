@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { outboundAPI } from '../services/api'
+import { transferAPI } from '../services/api'
 import { useNotificationStore } from './notification'
 
-export const useOutboundStore = defineStore('outbound', {
+export const useTransferStore = defineStore('transfer', {
   state: () => ({
-    outbounds: [],
+    transfers: [],
     selected: null,
     loading: false,
     pagination: {
@@ -19,10 +19,10 @@ export const useOutboundStore = defineStore('outbound', {
     async fetchList(params = {}) {
       this.loading = true
       try {
-        const res = await outboundAPI.list(params)
+        const res = await transferAPI.list(params)
         
         if (res.data && Array.isArray(res.data)) {
-          this.outbounds = res.data
+          this.transfers = res.data
           this.pagination = {
             current_page: res.meta?.current_page || res.current_page || 1,
             last_page: res.meta?.last_page || res.last_page || 1,
@@ -30,12 +30,20 @@ export const useOutboundStore = defineStore('outbound', {
             per_page: res.meta?.per_page || res.per_page || 25
           }
         } else if (Array.isArray(res)) {
-          this.outbounds = res
+          this.transfers = res
           this.pagination = { current_page: 1, last_page: 1, total: res.length, per_page: res.length }
+        } else if (res.data && res.data.data) {
+          this.transfers = res.data.data
+          this.pagination = {
+            current_page: res.data.current_page || 1,
+            last_page: res.data.last_page || 1,
+            total: res.data.total || 0,
+            per_page: res.data.per_page || 25
+          }
         }
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error('Gagal memuat daftar outbound')
+        notify.error('Gagal memuat daftar transfer')
         throw error
       } finally {
         this.loading = false
@@ -45,12 +53,12 @@ export const useOutboundStore = defineStore('outbound', {
     async fetchOne(id) {
       this.loading = true
       try {
-        const res = await outboundAPI.show(id)
+        const res = await transferAPI.show(id)
         this.selected = res.data || res
         return this.selected
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error('Gagal memuat detail outbound')
+        notify.error('Gagal memuat detail transfer')
         throw error
       } finally {
         this.loading = false
@@ -59,52 +67,52 @@ export const useOutboundStore = defineStore('outbound', {
 
     async create(data) {
       try {
-        const res = await outboundAPI.create(data)
+        const res = await transferAPI.create(data)
         const notify = useNotificationStore()
-        notify.success('Outbound berhasil dibuat')
+        notify.success('Pengajuan transfer berhasil dibuat')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal membuat outbound')
+        notify.error(error.response?.data?.message || 'Gagal membuat transfer')
         throw error
       }
     },
 
-    async ship(id, data) {
+    async approve(id) {
       try {
-        const res = await outboundAPI.ship(id, data)
+        const res = await transferAPI.approve(id)
         const notify = useNotificationStore()
-        notify.success('Proses pengiriman (Ship) berhasil')
+        notify.success('Transfer disetujui')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal melakukan pengiriman')
+        notify.error(error.response?.data?.message || 'Gagal menyetujui transfer')
         throw error
       }
     },
 
-    async pick(id) {
+    async reject(id) {
       try {
-        const res = await outboundAPI.pick(id)
+        const res = await transferAPI.reject(id)
         const notify = useNotificationStore()
-        notify.success('Status diubah ke Picking')
+        notify.success('Transfer ditolak')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal memproses pick')
+        notify.error(error.response?.data?.message || 'Gagal menolak transfer')
         throw error
       }
     },
 
-    async cancel(id) {
+    async execute(id) {
       try {
-        const res = await outboundAPI.cancel(id)
+        const res = await transferAPI.execute(id)
         const notify = useNotificationStore()
-        notify.success('Outbound dibatalkan')
+        notify.success('Transfer berhasil dieksekusi')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal membatalkan outbound')
+        notify.error(error.response?.data?.message || 'Gagal mengeksekusi transfer')
         throw error
       }
     }

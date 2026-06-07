@@ -202,8 +202,9 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { warehouseAPI } from '../services/api'
+import { useWarehouseStore } from '../stores/warehouse'
 import { planogramAPI } from '../services/api'
+import { useNotificationStore } from '../stores/notification'
 import {
   PlusIcon,
   MapIcon,
@@ -217,6 +218,8 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
 const router = useRouter()
+const warehouseStore = useWarehouseStore()
+const notify = useNotificationStore()
 
 const warehouses = ref([])
 const loading = ref(true)
@@ -249,8 +252,9 @@ async function fetchWarehouses() {
   loading.value = true
   error.value = null
   try {
-    const res = await warehouseAPI.list({ per_page: 100 })
-    const list = Array.isArray(res) ? res : (res.data || [])
+    await warehouseStore.fetchList({ per_page: 100 })
+    const list = warehouseStore.warehouses
+    
     // Fetch planogram for each warehouse
     const withPlanograms = await Promise.all(
       list.map(async (wh) => {
@@ -264,7 +268,8 @@ async function fetchWarehouses() {
     )
     warehouses.value = withPlanograms
   } catch (e) {
-    error.value = e.message || 'Terjadi kesalahan'
+    error.value = e.message || 'Terjadi kesalahan saat memuat data'
+    notify.error(error.value)
   } finally {
     loading.value = false
   }
@@ -283,6 +288,7 @@ async function showHistory(wh) {
     history.value = res.data || []
   } catch (e) {
     history.value = []
+    notify.error('Gagal memuat riwayat planogram')
   } finally {
     historyLoading.value = false
   }

@@ -172,7 +172,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useProductStore } from '../stores/product'
-import { categoryAPI } from '../services/api'
+import { useCategoryStore } from '../stores/category'
 import DataTable from '../components/common/DataTable.vue'
 import Modal from '../components/common/Modal.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
@@ -180,6 +180,7 @@ import BreadCrumb from '../components/common/BreadCrumb.vue'
 import { useDebounce } from '../composables/useDebounce'
 
 const store = useProductStore()
+const categoryStore = useCategoryStore()
 
 const columns = [
   { key: 'code', label: 'Kode / SKU', sortable: false },
@@ -277,12 +278,8 @@ async function save() {
 }
 
 async function fetchCategories() {
-  try {
-    const res = await categoryAPI.list()
-    categories.value = Array.isArray(res) ? res : (res.data || [])
-  } catch (error) {
-    console.error('Failed to load categories', error)
-  }
+  await categoryStore.fetchList()
+  categories.value = categoryStore.categories
 }
 
 onMounted(() => {

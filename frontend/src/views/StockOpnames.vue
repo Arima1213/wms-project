@@ -10,12 +10,12 @@
     <!-- Data Table -->
     <DataTable
       :columns="columns"
-      :data="opnames"
-      :loading="loading"
+      :data="store.opnames"
+      :loading="store.loading"
       :searchable="true"
       search-placeholder="Cari nomor opname..."
       :paginated="true"
-      :pagination="pagination"
+      :pagination="store.pagination"
       @page-change="handlePageChange"
       @search="handleSearch"
     >
@@ -55,11 +55,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { stockOpnameAPI } from '../services/api'
+import { useStockOpnameStore } from '../stores/stockOpname'
 import DataTable from '../components/common/DataTable.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
 import BreadCrumb from '../components/common/BreadCrumb.vue'
 import { useDebounce } from '../composables/useDebounce'
+
+const store = useStockOpnameStore()
 
 const columns = [
   { key: 'opname_number', label: 'No. Dokumen', sortable: false },
@@ -70,9 +72,6 @@ const columns = [
 
 const filterStatus = ref('')
 const currentSearch = ref('')
-const loading = ref(false)
-const opnames = ref([])
-const pagination = ref({ current_page: 1, last_page: 1, total: 0, per_page: 25 })
 
 function getStatusColor(status) {
   const map = {
@@ -85,32 +84,11 @@ function getStatusColor(status) {
 }
 
 async function fetchData(page = 1) {
-  loading.value = true
-  try {
-    const params = { page, per_page: 25 }
-    if (filterStatus.value !== '') params.status = filterStatus.value
-    if (currentSearch.value) params.search = currentSearch.value
-    
-    const res = await stockOpnameAPI.list(params)
-    const data = res.data || res
-    
-    if (Array.isArray(data)) {
-      opnames.value = data
-      pagination.value = { current_page: 1, last_page: 1, total: data.length, per_page: data.length }
-    } else {
-      opnames.value = data.data || []
-      pagination.value = {
-        current_page: data.current_page || 1,
-        last_page: data.last_page || 1,
-        total: data.total || 0,
-        per_page: data.per_page || 25
-      }
-    }
-  } catch (error) {
-    console.error(error)
-  } finally {
-    loading.value = false
-  }
+  const params = { page, per_page: 25 }
+  if (filterStatus.value !== '') params.status = filterStatus.value
+  if (currentSearch.value) params.search = currentSearch.value
+  
+  await store.fetchList(params)
 }
 
 function handlePageChange(page) {

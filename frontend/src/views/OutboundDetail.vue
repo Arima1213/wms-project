@@ -108,7 +108,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { outboundAPI } from '../services/api'
 import { useOutboundStore } from '../stores/outbound'
 import { useNotificationStore } from '../stores/notification'
 import StatusBadge from '../components/common/StatusBadge.vue'
@@ -138,11 +137,11 @@ function formatDate(dateStr) {
 async function fetchData() {
   loading.value = true
   try {
-    const res = await outboundAPI.show(route.params.id)
-    outbound.value = res.data?.data || res.data || res
+    const data = await store.fetchOne(route.params.id)
+    outbound.value = data?.data || data
     items.value = outbound.value.items || []
   } catch (error) {
-    notify.error('Gagal memuat detail outbound')
+    // handled by store
   } finally {
     loading.value = false
   }
@@ -152,11 +151,10 @@ async function pickAll() {
   if (!confirm('Proses pick seluruh item?')) return
   processing.value = true
   try {
-    await outboundAPI.pick(outbound.value.id)
-    notify.success('Status diubah ke Picking')
+    await store.pick(outbound.value.id)
     await fetchData()
   } catch (e) {
-    notify.error('Gagal memproses pick')
+    // handled by store
   } finally {
     processing.value = false
   }
@@ -179,11 +177,10 @@ async function cancelOutbound() {
   if (!confirm('Batalkan outbound ini?')) return
   processing.value = true
   try {
-    await outboundAPI.cancel(outbound.value.id)
-    notify.success('Outbound dibatalkan')
+    await store.cancel(outbound.value.id)
     await fetchData()
   } catch (e) {
-    notify.error('Gagal membatalkan outbound')
+    // handled by store
   } finally {
     processing.value = false
   }

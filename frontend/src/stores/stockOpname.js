@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { outboundAPI } from '../services/api'
+import { stockOpnameAPI } from '../services/api'
 import { useNotificationStore } from './notification'
 
-export const useOutboundStore = defineStore('outbound', {
+export const useStockOpnameStore = defineStore('stockOpname', {
   state: () => ({
-    outbounds: [],
+    opnames: [],
     selected: null,
     loading: false,
     pagination: {
@@ -19,10 +19,10 @@ export const useOutboundStore = defineStore('outbound', {
     async fetchList(params = {}) {
       this.loading = true
       try {
-        const res = await outboundAPI.list(params)
+        const res = await stockOpnameAPI.list(params)
         
         if (res.data && Array.isArray(res.data)) {
-          this.outbounds = res.data
+          this.opnames = res.data
           this.pagination = {
             current_page: res.meta?.current_page || res.current_page || 1,
             last_page: res.meta?.last_page || res.last_page || 1,
@@ -30,12 +30,21 @@ export const useOutboundStore = defineStore('outbound', {
             per_page: res.meta?.per_page || res.per_page || 25
           }
         } else if (Array.isArray(res)) {
-          this.outbounds = res
+          this.opnames = res
           this.pagination = { current_page: 1, last_page: 1, total: res.length, per_page: res.length }
+        } else if (res.data && res.data.data) {
+          // Laravel standard pagination format
+          this.opnames = res.data.data
+          this.pagination = {
+            current_page: res.data.current_page || 1,
+            last_page: res.data.last_page || 1,
+            total: res.data.total || 0,
+            per_page: res.data.per_page || 25
+          }
         }
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error('Gagal memuat daftar outbound')
+        notify.error('Gagal memuat daftar stock opname')
         throw error
       } finally {
         this.loading = false
@@ -45,12 +54,12 @@ export const useOutboundStore = defineStore('outbound', {
     async fetchOne(id) {
       this.loading = true
       try {
-        const res = await outboundAPI.show(id)
+        const res = await stockOpnameAPI.show(id)
         this.selected = res.data || res
         return this.selected
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error('Gagal memuat detail outbound')
+        notify.error('Gagal memuat detail stock opname')
         throw error
       } finally {
         this.loading = false
@@ -59,52 +68,39 @@ export const useOutboundStore = defineStore('outbound', {
 
     async create(data) {
       try {
-        const res = await outboundAPI.create(data)
+        const res = await stockOpnameAPI.create(data)
         const notify = useNotificationStore()
-        notify.success('Outbound berhasil dibuat')
+        notify.success('Stock Opname berhasil dibuat')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal membuat outbound')
+        notify.error(error.response?.data?.message || 'Gagal membuat stock opname')
         throw error
       }
     },
 
-    async ship(id, data) {
+    async submit(id, data) {
       try {
-        const res = await outboundAPI.ship(id, data)
+        const res = await stockOpnameAPI.submit(id, data)
         const notify = useNotificationStore()
-        notify.success('Proses pengiriman (Ship) berhasil')
+        notify.success('Stock Opname berhasil disubmit')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal melakukan pengiriman')
+        notify.error(error.response?.data?.message || 'Gagal mensubmit stock opname')
         throw error
       }
     },
 
-    async pick(id) {
+    async approve(id, data) {
       try {
-        const res = await outboundAPI.pick(id)
+        const res = await stockOpnameAPI.approve(id, data)
         const notify = useNotificationStore()
-        notify.success('Status diubah ke Picking')
+        notify.success('Stock Opname berhasil disetujui')
         return res
       } catch (error) {
         const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal memproses pick')
-        throw error
-      }
-    },
-
-    async cancel(id) {
-      try {
-        const res = await outboundAPI.cancel(id)
-        const notify = useNotificationStore()
-        notify.success('Outbound dibatalkan')
-        return res
-      } catch (error) {
-        const notify = useNotificationStore()
-        notify.error(error.response?.data?.message || 'Gagal membatalkan outbound')
+        notify.error(error.response?.data?.message || 'Gagal menyetujui stock opname')
         throw error
       }
     }

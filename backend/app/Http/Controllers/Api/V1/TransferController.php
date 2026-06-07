@@ -4,11 +4,21 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Transfer;
+use App\Http\Requests\StoreTransferRequest;
+use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TransferController extends Controller
 {
+    protected TransferService $transferService;
+
+    public function __construct(TransferService $transferService)
+    {
+        $this->transferService = $transferService;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = Transfer::with('sourceWarehouse', 'destWarehouse', 'user');
@@ -27,33 +37,32 @@ class TransferController extends Controller
         return response()->json(['data' => $transfer]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTransferRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'source_warehouse_id' => 'required|exists:warehouses,id',
-            'dest_warehouse_id' => 'required|exists:warehouses,id|different:source_warehouse_id',
-            'reason' => 'nullable|string',
-            'notes' => 'nullable|string',
-            'items' => 'nullable|array',
-        ]);
+        $validated = $request->validated();
 
-        $transfer = Transfer::create([
-            'transfer_number' => 'TRF-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
-            'source_warehouse_id' => $validated['source_warehouse_id'],
-            'dest_warehouse_id' => $validated['dest_warehouse_id'],
-            'user_id' => $request->user()->id,
-            'status' => 'pending',
-            'reason' => $validated['reason'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        DB::beginTransaction();
+        try {
+            $transfer = Transfer::create([
+                'transfer_number' => 'TRF-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+                'source_warehouse_id' => $validated['source_warehouse_id'],
+                'dest_warehouse_id' => $validated['dest_warehouse_id'],
+                'user_id' => $request->user()->id,
+                'status' => 'pending',
+                'reason' => $validated['reason'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
-        if (!empty($validated['items'])) {
             foreach ($validated['items'] as $item) {
                 $transfer->items()->create($item);
             }
-        }
 
-        return response()->json(['data' => $transfer->load('items')], 201);
+            DB::commit();
+            return response()->json(['data' => $transfer->load('items')], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to create transfer', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function approve(Request $request, string|int $transfer): JsonResponse
@@ -80,17 +89,15 @@ class TransferController extends Controller
         return response()->json(['data' => $transfer]);
     }
 
-    public function execute(Request $request, string|int $transfer): JsonResponse
+    public function execute(Request $request, string|int $transferId): JsonResponse
     {
-        $transfer = Transfer::findOrFail($transfer);
-        if ($transfer->status !== 'approved') {
-            return response()->json(['message' => 'Only approved transfers can be executed'], 422);
+        $transfer = Transfer::findOrFail($transferId);
+        
+        try {
+            $executedTransfer = $this->transferService->execute($transfer, $request->user()->id);
+            return response()->json(['data' => $executedTransfer]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-        $transfer->update([
-            'status' => 'executed',
-            'received_at' => now(),
-            'received_by' => $request->user()->id,
-        ]);
-        return response()->json(['data' => $transfer]);
     }
 }

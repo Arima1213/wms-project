@@ -153,7 +153,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useOutboundStore } from '../stores/outbound'
-import { warehouseAPI, productAPI, outboundAPI } from '../services/api'
+import { useWarehouseStore } from '../stores/warehouse'
+import { useProductStore } from '../stores/product'
 import DataTable from '../components/common/DataTable.vue'
 import Modal from '../components/common/Modal.vue'
 import StatusBadge from '../components/common/StatusBadge.vue'
@@ -165,6 +166,8 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
 const store = useOutboundStore()
+const warehouseStore = useWarehouseStore()
+const productStore = useProductStore()
 const notify = useNotificationStore()
 
 const columns = [
@@ -229,22 +232,13 @@ function handleSearch(query) {
 }
 
 async function fetchWarehouses() {
-  try {
-    const res = await warehouseAPI.list({ per_page: 100, is_active: 1 })
-    warehouses.value = Array.isArray(res) ? res : (res.data || [])
-  } catch (e) {
-    console.error(e)
-  }
+  await warehouseStore.fetchList({ per_page: 100, is_active: 1 })
+  warehouses.value = warehouseStore.warehouses
 }
 
 async function fetchProducts() {
-  try {
-    const res = await productAPI.list({ per_page: 500, is_active: 1 })
-    products.value = res.data?.data || res.data || []
-    if (Array.isArray(res)) products.value = res
-  } catch (e) {
-    console.error(e)
-  }
+  await productStore.fetchList({ per_page: 500, is_active: 1 })
+  products.value = productStore.products
 }
 
 function openCreateModal() {
@@ -300,11 +294,10 @@ async function quickShip(row) {
 async function cancelOutbound(row) {
   if (!confirm(`Batalkan Outbound ${row.outbound_number}?`)) return
   try {
-    await outboundAPI.cancel(row.id)
-    notify.success('Outbound dibatalkan')
+    await store.cancel(row.id)
     fetchData(store.pagination.current_page)
   } catch (e) {
-    notify.error('Gagal membatalkan outbound')
+    // handled by store
   }
 }
 

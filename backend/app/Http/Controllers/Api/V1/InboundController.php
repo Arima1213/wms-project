@@ -4,12 +4,22 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inbound;
-use App\Models\InboundItem;
+use App\Http\Requests\StoreInboundRequest;
+use App\Http\Requests\UpdateInboundRequest;
+use App\Services\InboundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InboundController extends Controller
 {
+    protected InboundService $inboundService;
+
+    public function __construct(InboundService $inboundService)
+    {
+        $this->inboundService = $inboundService;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = Inbound::with('warehouse', 'user');
@@ -31,43 +41,41 @@ class InboundController extends Controller
         return response()->json(['data' => $inbound]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreInboundRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'warehouse_id' => 'required|exists:warehouses,id',
-            'source_type' => 'nullable|string',
-            'source_reference' => 'nullable|string',
-            'expected_date' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'items' => 'nullable|array',
-        ]);
+        $validated = $request->validated();
 
-        $inbound = Inbound::create([
-            'inbound_number' => 'INB-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
-            'warehouse_id' => $validated['warehouse_id'],
-            'user_id' => $request->user()->id,
-            'status' => 'pending',
-            'expected_date' => $validated['expected_date'] ?? null,
-            'source_type' => $validated['source_type'] ?? null,
-            'source_reference' => $validated['source_reference'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        DB::beginTransaction();
+        try {
+            $inbound = Inbound::create([
+                'inbound_number' => 'INB-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+                'warehouse_id' => $validated['warehouse_id'],
+                'user_id' => $request->user()->id,
+                'status' => 'pending',
+                'expected_date' => $validated['expected_date'] ?? null,
+                'source_type' => $validated['source_type'] ?? null,
+                'source_reference' => $validated['source_reference'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
-        if (!empty($validated['items'])) {
-            foreach ($validated['items'] as $item) {
-                $inbound->items()->create($item);
+            if (!empty($validated['items'])) {
+                foreach ($validated['items'] as $item) {
+                    $inbound->items()->create($item);
+                }
             }
-        }
 
-        return response()->json(['data' => $inbound->load('items')], 201);
+            DB::commit();
+            return response()->json(['data' => $inbound->load('items')], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to create inbound', 'error' => $e->getMessage()], 500);
+        }
     }
 
-    public function update(Request $request, string|int $inbound): JsonResponse
+    public function update(UpdateInboundRequest $request, string|int $inbound): JsonResponse
     {
         $inbound = Inbound::findOrFail($inbound);
-        $inbound->update($request->only([
-            'source_type', 'source_reference', 'expected_date', 'notes', 'status',
-        ]));
+        $inbound->update($request->validated());
         return response()->json(['data' => $inbound]);
     }
 
@@ -81,49 +89,16 @@ class InboundController extends Controller
         return response()->json(['message' => 'Inbound deleted']);
     }
 
-    public function receive(Request $request, string|int $inbound): JsonResponse
+    public function receive(Request $request, string|int $inboundId): JsonResponse
     {
-        $inbound = Inbound::findOrFail($inbound);
-        if ($inbound->status !== 'pending') {
-            return response()->json(['message' => 'Inbound already received'], 422);
+        $inbound = Inbound::findOrFail($inboundId);
+
+        try {
+            $receivedInbound = $this->inboundService->receive($inbound, $request->user()->id);
+            return response()->json(['data' => $receivedInbound]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $inbound->update([
-            'status' => 'received',
-            'received_date' => now(),
-        ]);
-
-        // Create stock items for each inbound item
-        foreach ($inbound->items as $item) {
-            $item->update(['received_qty' => $item->qty, 'received_at' => now()]);
-
-            // Add to Inventory
-            $inventory = \App\Models\Inventory::firstOrNew([
-                'product_id' => $item->product_id,
-                'warehouse_id' => $inbound->warehouse_id,
-                'batch_number' => $item->batch_number,
-                'rack_slot_id' => null, // Optional, can be mapped to a default receiving slot later
-            ]);
-            
-            $inventory->quantity += $item->qty;
-            if ($item->expiry_date) {
-                $inventory->expiry_date = $item->expiry_date;
-            }
-            $inventory->save();
-
-            // Record transaction
-            \App\Models\InventoryTransaction::create([
-                'inventory_id' => $inventory->id,
-                'type' => 'in',
-                'quantity' => $item->qty,
-                'reference_type' => 'inbound',
-                'reference_id' => $inbound->id,
-                'notes' => 'Received from inbound ' . $inbound->inbound_number,
-                'created_by' => $request->user()->id,
-            ]);
-        }
-
-        return response()->json(['data' => $inbound]);
     }
 
     public function cancel(Request $request, string|int $inbound): JsonResponse
