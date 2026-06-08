@@ -260,9 +260,10 @@ function openEditModal(row) {
 
 async function save() {
   if (!form.value.code || !form.value.name) return
-  saving.value = true
   try {
+    saving.value = true
     const payload = { ...form.value }
+    console.log('Sending payload:', payload);
     if (editingId.value) {
       await store.update(editingId.value, payload)
     } else {

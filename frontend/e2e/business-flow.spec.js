@@ -5,6 +5,17 @@ test.describe('WMS End-to-End Business Flow', () => {
     // Set a longer timeout for this comprehensive test
     test.setTimeout(120000);
 
+    // Optional: Add network failure listener to debug issues
+    page.on('response', async response => {
+      if (response.status() >= 400 && response.url().includes('/api/v1/')) {
+        console.log(`[FAILED] ${response.status()} ${response.url()}`);
+        try {
+          console.log('Request body:', response.request().postData());
+          console.log('Response body:', await response.text());
+        } catch (e) {}
+      }
+    });
+
     // 1. Authentication
     await page.goto('/login');
     await page.fill('input[type="email"]', 'admin@wms.local');
@@ -38,6 +49,7 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.fill('input[placeholder="SKU-001"]', 'SKU-TEST-999');
     await page.fill('input[placeholder="Kopi Arabica..."]', 'Produk Testing Playwright');
     // Category select: it's a select element, we can use its options if any, or leave it blank
+    await page.selectOption('select:has(option[value="standard"])', 'standard');
     await page.click('button:has-text("Simpan")');
     await expect(page.locator('text=Produk Testing Playwright')).toBeVisible({ timeout: 15000 });
 
@@ -49,15 +61,15 @@ test.describe('WMS End-to-End Business Flow', () => {
     // Fill Inbound Header
     await page.fill('input[placeholder="PO-2023-001"]', 'PO-TEST-999');
     
-    // Select Warehouse (it's the second select)
-    const selects = page.locator('.modal-body select, select.input');
-    await selects.nth(1).selectOption({ label: 'Gudang Testing Playwright' });
+    // Select Warehouse (it's the third select, first is the table filter)
+    const selects = page.locator('select.input');
+    await selects.nth(2).selectOption({ label: 'Gudang Testing Playwright' });
 
     // Add Item
     await page.click('text=+ Tambah Item');
     
-    // Select Product in the item row (third select overall)
-    await selects.nth(2).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
+    // Select Product in the item row (fourth select overall)
+    await selects.nth(3).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
     
     // Fill Qty
     await page.fill('input[type="number"]', '100');
@@ -67,8 +79,8 @@ test.describe('WMS End-to-End Business Flow', () => {
 
     // 5. Receive Inbound
     // Click detail
-    await page.click('text=PO-TEST-999');
-    await page.click('button:has-text("Terima Semua (Auto)")');
+    await page.locator('tr').filter({ hasText: 'PO-TEST-999' }).locator('text=Detail').click();
+    await page.click('button:has-text("Terima Barang (Receive All)")');
     await expect(page.locator('text=Status: RECEIVED')).toBeVisible({ timeout: 15000 });
 
     // 6. Outbound Flow (Barang Keluar)
@@ -77,7 +89,7 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('text=+ Buat Outbound');
     
     // Select Warehouse
-    await page.locator('select.input').nth(1).selectOption({ label: 'Gudang Testing Playwright' });
+    await page.locator('select.input').nth(2).selectOption({ label: 'Gudang Testing Playwright' });
 
     // Fill references
     await page.fill('input[placeholder="SO-2023-001"]', 'SO-TEST-999');
@@ -87,7 +99,7 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('text=+ Tambah Item');
     
     // Select Product
-    await page.locator('select.input').nth(2).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
+    await page.locator('select.input').nth(3).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
     
     // Fill Qty
     await page.fill('input[type="number"]', '20');
@@ -96,11 +108,11 @@ test.describe('WMS End-to-End Business Flow', () => {
     await expect(page.locator('text=SO-TEST-999')).toBeVisible({ timeout: 15000 });
 
     // 7. Pick & Ship Outbound
-    await page.click('text=SO-TEST-999');
-    await page.click('button:has-text("Pick Semua (Auto)")');
+    await page.locator('tr').filter({ hasText: 'SO-TEST-999' }).locator('text=Detail').click();
+    await page.click('button:has-text("Proses Pick")');
     await expect(page.locator('text=Status: PICKED')).toBeVisible({ timeout: 15000 });
     
-    await page.click('button:has-text("Kirim Pesanan")');
+    await page.click('button:has-text("Kirim (Ship)")');
     await expect(page.locator('text=Status: SHIPPED')).toBeVisible({ timeout: 15000 });
 
   });

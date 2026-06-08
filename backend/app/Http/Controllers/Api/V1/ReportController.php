@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Inventory, InventoryTransaction, Product, Warehouse};
+use App\Models\{Inventory, StockTransaction, Product, Warehouse};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +24,7 @@ class ReportController extends Controller
 
     public function mutations(Request $request): JsonResponse
     {
-        $query = InventoryTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'user:id,name'])
+        $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'user:id,name'])
             ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
             ->when($request->product_id, fn($q) => $q->where('product_id', $request->product_id))
             ->when($request->type, fn($q) => $q->where('type', $request->type))
@@ -51,7 +51,7 @@ class ReportController extends Controller
                 DB::raw('SUM(i.quantity) as total_qty'),
                 DB::raw("MAX(it.created_at) as last_movement"),
                 DB::raw("EXTRACT(DAY FROM NOW() - MAX(it.created_at)) as days_since_movement"))
-            ->leftJoin('inventory_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
+            ->leftJoin('stock_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
             ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
             ->where('i.quantity', '>', 0)
             ->groupBy('p.id', 'p.sku', 'p.name', 'w.id', 'w.code')
@@ -98,7 +98,7 @@ class ReportController extends Controller
 
     public function activity(Request $request): JsonResponse
     {
-        $data = InventoryTransaction::with(['user:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
+        $data = StockTransaction::with(['user:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
             ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
             ->orderByDesc('created_at')
             ->paginate($request->get('per_page', 50));

@@ -39,6 +39,11 @@ class Warehouse extends Model
         return $this->hasOne(Planogram::class);
     }
 
+    public function inventory(): HasMany
+    {
+        return $this->hasMany(Inventory::class);
+    }
+
     public function inbounds(): HasMany
     {
         return $this->hasMany(Inbound::class);

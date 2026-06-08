@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Inventory, InventoryTransaction, Product, Warehouse, Inbound, Outbound};
+use App\Models\{Inventory, StockTransaction, Product, Warehouse, Inbound, Outbound};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +23,7 @@ class DashboardController extends Controller
             ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
             ->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
 
-        $todayTransactions = (clone $baseQuery(new InventoryTransaction))
+        $todayTransactions = (clone $baseQuery(new StockTransaction))
             ->whereDate('created_at', now())->count();
 
         $todayInbounds = (clone $baseQuery(new Inbound))
@@ -34,10 +34,10 @@ class DashboardController extends Controller
 
         // Low stock alerts
         $lowStockAlerts = Inventory::query()
-            ->with('product')
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
-            ->whereColumn('quantity', '<=', 'product.reorder_point')
-            ->where('quantity', '>', 0)
+            ->join('products', 'inventory.product_id', '=', 'products.id')
+            ->when($warehouseId, fn($q) => $q->where('inventory.warehouse_id', $warehouseId))
+            ->whereColumn('inventory.quantity', '<=', 'products.reorder_point')
+            ->where('inventory.quantity', '>', 0)
             ->count();
 
         // Near expiry alerts
@@ -54,7 +54,7 @@ class DashboardController extends Controller
         ]);
 
         // Recent transactions
-        $recentTx = InventoryTransaction::with(['product:id,name,sku', 'user:id,name', 'warehouse:id,name'])
+        $recentTx = StockTransaction::with(['product:id,name,sku', 'user:id,name', 'warehouse:id,name'])
             ->orderByDesc('created_at')->limit(10)->get();
 
         return response()->json([
