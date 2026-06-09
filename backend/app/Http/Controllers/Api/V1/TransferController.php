@@ -68,6 +68,8 @@ class TransferController extends Controller
     public function approve(Request $request, string|int $transfer): JsonResponse
     {
         $transfer = Transfer::findOrFail($transfer);
+        $this->authorize('approve', $transfer);
+
         if ($transfer->status !== 'pending') {
             return response()->json(['message' => 'Cannot approve this transfer'], 422);
         }
@@ -82,6 +84,8 @@ class TransferController extends Controller
     public function reject(Request $request, string|int $transfer): JsonResponse
     {
         $transfer = Transfer::findOrFail($transfer);
+        $this->authorize('reject', $transfer);
+
         if ($transfer->status !== 'pending') {
             return response()->json(['message' => 'Cannot reject this transfer'], 422);
         }
@@ -92,6 +96,7 @@ class TransferController extends Controller
     public function execute(Request $request, string|int $transferId): JsonResponse
     {
         $transfer = Transfer::findOrFail($transferId);
+        $this->authorize('execute', $transfer);
         
         try {
             $executedTransfer = $this->transferService->execute($transfer, $request->user()->id);

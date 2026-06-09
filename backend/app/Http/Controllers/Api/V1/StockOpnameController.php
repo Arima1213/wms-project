@@ -39,6 +39,8 @@ class StockOpnameController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', StockOpname::class);
+
         $validated = $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
             'opname_number' => 'nullable|string',
@@ -61,6 +63,8 @@ class StockOpnameController extends Controller
     public function start(Request $request, string|int $opname): JsonResponse
     {
         $opname = StockOpname::findOrFail($opname);
+        $this->authorize('start', $opname);
+
         if ($opname->status !== 'draft') {
             return response()->json(['message' => 'Cannot start this stock opname'], 422);
         }
@@ -71,6 +75,7 @@ class StockOpnameController extends Controller
     public function update(Request $request, string|int $opnameId): JsonResponse
     {
         $opname = StockOpname::findOrFail($opnameId);
+        $this->authorize('update', $opname);
         
         $validated = $request->validate([
             'notes' => 'nullable|string',
@@ -115,6 +120,8 @@ class StockOpnameController extends Controller
     public function submit(Request $request, string|int $opname): JsonResponse
     {
         $opname = StockOpname::findOrFail($opname);
+        $this->authorize('submit', $opname);
+
         if ($opname->status !== 'in_progress') {
             return response()->json(['message' => 'Cannot submit this stock opname'], 422);
         }
@@ -125,6 +132,7 @@ class StockOpnameController extends Controller
     public function approve(Request $request, string|int $opnameId): JsonResponse
     {
         $opname = StockOpname::findOrFail($opnameId);
+        $this->authorize('approve', $opname);
         
         try {
             $approvedOpname = $this->stockOpnameService->approve($opname, $request->user()->id);

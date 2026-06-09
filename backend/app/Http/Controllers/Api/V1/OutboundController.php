@@ -100,6 +100,8 @@ class OutboundController extends Controller
     public function pick(Request $request, string|int $outbound): JsonResponse
     {
         $outbound = Outbound::findOrFail($outbound);
+        $this->authorize('pick', $outbound);
+
         if ($outbound->status !== 'pending') {
             return response()->json(['message' => 'Outbound already picked'], 422);
         }
@@ -110,6 +112,7 @@ class OutboundController extends Controller
     public function ship(Request $request, string|int $outboundId): JsonResponse
     {
         $outbound = Outbound::findOrFail($outboundId);
+        $this->authorize('ship', $outbound);
         
         try {
             $shippedOutbound = $this->outboundService->ship($outbound, $request->user()->id);
@@ -122,6 +125,8 @@ class OutboundController extends Controller
     public function cancel(Request $request, string|int $outbound): JsonResponse
     {
         $outbound = Outbound::findOrFail($outbound);
+        $this->authorize('cancel', $outbound);
+
         if (in_array($outbound->status, ['shipped', 'cancelled'])) {
             return response()->json(['message' => 'Cannot cancel this outbound'], 422);
         }

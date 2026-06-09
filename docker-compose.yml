@@ -6,6 +6,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: wms-app
+    env_file: .env.docker
     restart: unless-stopped
     working_dir: /var/www
     volumes:
@@ -20,7 +21,7 @@ services:
       - DB_PORT=5432
       - DB_DATABASE=wms
       - DB_USERNAME=wms
-      - DB_PASSWORD=wms_secret
+      - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
@@ -32,7 +33,7 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=wms
       - MEILISEARCH_HOST=http://meilisearch:7700
-      - MEILISEARCH_KEY=masterKey
+      - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,11 +57,12 @@ services:
   postgres:
     image: postgis/postgis:16-3.4
     container_name: wms-postgres
+    env_file: .env.docker
     restart: unless-stopped
     environment:
       - POSTGRES_DB=wms
       - POSTGRES_USER=wms
-      - POSTGRES_PASSWORD=wms_secret
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -77,8 +79,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: wms-redis
+    env_file: .env.docker
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     ports:
@@ -89,11 +92,12 @@ services:
   minio:
     image: minio/minio:latest
     container_name: wms-minio
+    env_file: .env.docker
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_DEFAULT_BUCKETS=wms
     volumes:
       - minio-data:/data
@@ -106,9 +110,10 @@ services:
   meilisearch:
     image: getmeili/meilisearch:v1.6
     container_name: wms-meilisearch
+    env_file: .env.docker
     restart: unless-stopped
     environment:
-      - MEILI_MASTER_KEY=masterKey
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
       - MEILI_ENV=development
     volumes:
       - meilisearch-data:/meili_data
@@ -122,6 +127,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: wms-horizon
+    env_file: .env.docker
     restart: unless-stopped
     command: php artisan horizon
     working_dir: /var/www
@@ -135,7 +141,7 @@ services:
       - DB_PORT=5432
       - DB_DATABASE=wms
       - DB_USERNAME=wms
-      - DB_PASSWORD=wms_secret
+      - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_DRIVER=redis
@@ -151,6 +157,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: wms-reverb
+    env_file: .env.docker
     restart: unless-stopped
     command: php artisan reverb:start --host=0.0.0.0
     working_dir: /var/www
@@ -165,7 +172,7 @@ services:
       - DB_PORT=5432
       - DB_DATABASE=wms
       - DB_USERNAME=wms
-      - DB_PASSWORD=wms_secret
+      - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:

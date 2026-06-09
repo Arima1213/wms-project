@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class AuthController extends Controller
 {
@@ -42,7 +44,7 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', PasswordRule::min(8)],
         ]);
 
         $user = User::create([
@@ -83,7 +85,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'current_password' => 'required|string',
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', PasswordRule::min(8)],
         ]);
 
         $user = $request->user();
@@ -97,13 +99,43 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request): JsonResponse
     {
-        // TODO: Implement with Laravel notifications
-        return response()->json(['message' => 'Password reset link sent']);
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        // Generate a reset token
+        $token = Password::createToken($user);
+
+        // Send the notification
+        $user->notify(new ResetPasswordNotification($token));
+
+        return response()->json(['message' => 'Password reset link sent to your email']);
     }
 
     public function resetPassword(Request $request): JsonResponse
     {
-        // TODO: Implement with Laravel notifications
-        return response()->json(['message' => 'Password reset successfully']);
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => ['required', 'confirmed', PasswordRule::min(8)],
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->save();
+            }
+        );
+
+        return match ($status) {
+            Password::PASSWORD_RESET => response()->json(['message' => 'Password has been reset successfully']),
+            Password::INVALID_USER => response()->json(['message' => 'We cannot find a user with that email address'], 422),
+            Password::INVALID_TOKEN => response()->json(['message' => 'This password reset token is invalid or has expired'], 422),
+            default => response()->json(['message' => 'Unable to reset password'], 422),
+        };
     }
 }

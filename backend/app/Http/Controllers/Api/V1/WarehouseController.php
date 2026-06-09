@@ -53,12 +53,14 @@ class WarehouseController extends Controller
 
     public function summary(string|int $warehouse): JsonResponse
     {
+        $this->authorize('view', \App\Models\Warehouse::findOrFail((int) $warehouse));
         $summary = $this->warehouseService->getSummary((int) $warehouse);
         return response()->json(['data' => $summary]);
     }
 
     public function utilization(string|int $warehouse): JsonResponse
     {
+        $this->authorize('view', \App\Models\Warehouse::findOrFail((int) $warehouse));
         $utilization = $this->warehouseService->getUtilization((int) $warehouse);
         return response()->json(['data' => $utilization]);
     }

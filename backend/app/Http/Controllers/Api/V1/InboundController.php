@@ -107,6 +107,7 @@ class InboundController extends Controller
     public function receive(Request $request, string|int $inboundId): JsonResponse
     {
         $inbound = Inbound::findOrFail($inboundId);
+        $this->authorize('receive', $inbound);
 
         try {
             $receivedInbound = $this->inboundService->receive($inbound, $request->user()->id);
@@ -119,6 +120,8 @@ class InboundController extends Controller
     public function cancel(Request $request, string|int $inbound): JsonResponse
     {
         $inbound = Inbound::findOrFail($inbound);
+        $this->authorize('cancel', $inbound);
+
         if (in_array($inbound->status, ['received', 'cancelled'])) {
             return response()->json(['message' => 'Cannot cancel this inbound'], 422);
         }
