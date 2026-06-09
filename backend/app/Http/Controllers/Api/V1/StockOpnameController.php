@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\StockOpname;
+use App\Services\DocumentSequenceService;
 use App\Services\StockOpnameService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,10 +13,12 @@ use Illuminate\Support\Facades\DB;
 class StockOpnameController extends Controller
 {
     protected StockOpnameService $stockOpnameService;
+    protected DocumentSequenceService $documentSequence;
 
-    public function __construct(StockOpnameService $stockOpnameService)
+    public function __construct(StockOpnameService $stockOpnameService, DocumentSequenceService $documentSequence)
     {
         $this->stockOpnameService = $stockOpnameService;
+        $this->documentSequence = $documentSequence;
     }
 
     public function index(Request $request): JsonResponse
@@ -48,7 +51,7 @@ class StockOpnameController extends Controller
         ]);
 
         $opname = StockOpname::create([
-            'opname_number' => $validated['opname_number'] ?? 'SO-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+            'opname_number' => $validated['opname_number'] ?? $this->documentSequence->getNextNumber('SO'),
             'warehouse_id' => $validated['warehouse_id'],
             'created_by' => $request->user()->id,
             'status' => 'draft',

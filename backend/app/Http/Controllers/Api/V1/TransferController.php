@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Transfer;
 use App\Http\Requests\StoreTransferRequest;
+use App\Services\DocumentSequenceService;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,10 +14,12 @@ use Illuminate\Support\Facades\DB;
 class TransferController extends Controller
 {
     protected TransferService $transferService;
+    protected DocumentSequenceService $documentSequence;
 
-    public function __construct(TransferService $transferService)
+    public function __construct(TransferService $transferService, DocumentSequenceService $documentSequence)
     {
         $this->transferService = $transferService;
+        $this->documentSequence = $documentSequence;
     }
 
     public function index(Request $request): JsonResponse
@@ -44,7 +47,7 @@ class TransferController extends Controller
         DB::beginTransaction();
         try {
             $transfer = Transfer::create([
-                'transfer_number' => 'TRF-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+                'transfer_number' => $this->documentSequence->getNextNumber('TRF'),
                 'source_warehouse_id' => $validated['source_warehouse_id'],
                 'dest_warehouse_id' => $validated['dest_warehouse_id'],
                 'created_by' => $request->user()->id,

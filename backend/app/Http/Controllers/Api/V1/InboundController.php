@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inbound;
 use App\Http\Requests\StoreInboundRequest;
 use App\Http\Requests\UpdateInboundRequest;
+use App\Services\DocumentSequenceService;
 use App\Services\InboundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,10 +15,12 @@ use Illuminate\Support\Facades\DB;
 class InboundController extends Controller
 {
     protected InboundService $inboundService;
+    protected DocumentSequenceService $documentSequence;
 
-    public function __construct(InboundService $inboundService)
+    public function __construct(InboundService $inboundService, DocumentSequenceService $documentSequence)
     {
         $this->inboundService = $inboundService;
+        $this->documentSequence = $documentSequence;
     }
 
     public function index(Request $request): JsonResponse
@@ -57,7 +60,7 @@ class InboundController extends Controller
         DB::beginTransaction();
         try {
             $inbound = Inbound::create([
-                'inbound_number' => 'INB-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+                'inbound_number' => $this->documentSequence->getNextNumber('INB'),
                 'warehouse_id' => $validated['warehouse_id'],
                 'created_by' => $request->user()->id,
                 'status' => 'pending',
@@ -109,8 +112,16 @@ class InboundController extends Controller
         $inbound = Inbound::findOrFail($inboundId);
         $this->authorize('receive', $inbound);
 
+        $validated = $request->validate([
+            'items' => 'nullable|array',
+            'items.*.id' => 'required_with:items|integer|exists:inbound_items,id',
+            'items.*.received_qty' => 'required_with:items|numeric|min:0',
+        ]);
+
+        $items = $validated['items'] ?? null;
+
         try {
-            $receivedInbound = $this->inboundService->receive($inbound, $request->user()->id);
+            $receivedInbound = $this->inboundService->receive($inbound, $request->user()->id, $items);
             return response()->json(['data' => $receivedInbound]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);

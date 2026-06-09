@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
 use App\Models\StockTransaction;
 use Illuminate\Support\Str;
@@ -215,14 +216,23 @@ class InventoryService
         ]);
 
         $stockBefore = $inventory->quantity ?? 0;
-        $inventory->quantity += $differenceQty;
-        $inventory->available_quantity = ($inventory->available_quantity ?? 0) + $differenceQty;
-        
-        // Prevent negative stock strictly? For SO, maybe we allow it to match physical.
-        if ($inventory->quantity < 0) {
-            $inventory->quantity = 0;
-            $inventory->available_quantity = 0;
+        $newQuantity = ($inventory->quantity ?? 0) + $differenceQty;
+        $newAvailable = ($inventory->available_quantity ?? 0) + $differenceQty;
+
+        // Throw exception instead of silent clamp — negative stock is a data integrity violation
+        if ($newQuantity < 0) {
+            throw new InsufficientStockException(
+                "Insufficient stock for product {$productId} in warehouse {$warehouseId}. "
+                    . "Adjustment would result in {$newQuantity} (requested: {$differenceQty}, current: " . ($inventory->quantity ?? 0) . ")",
+                $productId,
+                $warehouseId,
+                $differenceQty,
+                $inventory->quantity ?? 0
+            );
         }
+
+        $inventory->quantity = $newQuantity;
+        $inventory->available_quantity = $newAvailable;
 
         $inventory->save();
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Outbound;
 use App\Http\Requests\StoreOutboundRequest;
 use App\Http\Requests\UpdateOutboundRequest;
+use App\Services\DocumentSequenceService;
 use App\Services\OutboundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,10 +15,12 @@ use Illuminate\Support\Facades\DB;
 class OutboundController extends Controller
 {
     protected OutboundService $outboundService;
+    protected DocumentSequenceService $documentSequence;
 
-    public function __construct(OutboundService $outboundService)
+    public function __construct(OutboundService $outboundService, DocumentSequenceService $documentSequence)
     {
         $this->outboundService = $outboundService;
+        $this->documentSequence = $documentSequence;
     }
 
     public function index(Request $request): JsonResponse
@@ -48,7 +51,7 @@ class OutboundController extends Controller
         DB::beginTransaction();
         try {
             $outbound = Outbound::create([
-                'outbound_number' => 'OUT-' . date('Ymd') . '-' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT),
+                'outbound_number' => $this->documentSequence->getNextNumber('OUT'),
                 'warehouse_id' => $validated['warehouse_id'],
                 'created_by' => $request->user()->id,
                 'status' => 'pending',
