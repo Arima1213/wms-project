@@ -10,6 +10,16 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
+    public function index(Request $request): JsonResponse
+    {
+        $query = Document::with('user:id,name')
+            ->when($request->type, fn($q) => $q->where('type', $request->type))
+            ->orderByDesc('created_at');
+
+        $data = $query->paginate($request->get('per_page', 20));
+        return response()->json($data);
+    }
+
     public function upload(Request $request): JsonResponse
     {
         $request->validate([

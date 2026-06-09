@@ -27,7 +27,10 @@
           </div>
         </div>
         <button @click="logout" class="w-full flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition-colors">
-          <ArrowRightOnRectangleIcon class="w-5 h-5" />
+          <DocumentTextIcon,
+  MapPinIcon,
+  ServerStackIcon,
+  ArrowRightOnRectangleIcon class="w-5 h-5" />
           Logout
         </button>
       </div>
@@ -55,6 +58,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   HomeIcon,
   BuildingOfficeIcon,
+  TagIcon,
   CubeIcon,
   ArrowUpCircleIcon,
   ArrowDownCircleIcon,
@@ -62,6 +66,9 @@ import {
   MapIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  DocumentTextIcon,
+  MapPinIcon,
+  ServerStackIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/vue/24/outline'
 
@@ -77,6 +84,7 @@ const userInitials = computed(() => {
 const menuItems = [
   { to: '/', label: 'Dashboard', icon: HomeIcon },
   { to: '/warehouses', label: 'Gudang', icon: BuildingOfficeIcon },
+  { to: '/categories', label: 'Kategori', icon: TagIcon },
   { to: '/products', label: 'Produk', icon: CubeIcon },
   { to: '/inbounds', label: 'Barang Masuk', icon: ArrowUpCircleIcon },
   { to: '/outbounds', label: 'Barang Keluar', icon: ArrowDownCircleIcon },
@@ -85,6 +93,10 @@ const menuItems = [
   { to: '/transfers', label: 'Transfer Stok', icon: ArrowUpCircleIcon },
   { to: '/planograms', label: 'Planogram', icon: MapIcon },
   { to: '/reports', label: 'Laporan', icon: ChartBarIcon },
+  { to: '/zones', label: 'Zona', icon: MapPinIcon },
+  { to: '/racks', label: 'Rak & Slot', icon: ServerStackIcon },
+  { to: '/documents', label: 'Dokumen', icon: DocumentTextIcon },
+  { to: '/audit-logs', label: 'Audit Log', icon: ClipboardDocumentListIcon },
   { to: '/settings', label: 'Pengaturan', icon: Cog6ToothIcon },
 ]
 

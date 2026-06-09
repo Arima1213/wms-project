@@ -97,6 +97,10 @@ export const productAPI = {
 // Categories
 export const categoryAPI = {
   list: (params) => api.get('/categories', { params }),
+  show: (id) => api.get(`/categories/${id}`),
+  create: (data) => api.post('/categories', data),
+  update: (id, data) => api.put(`/categories/${id}`, data),
+  delete: (id) => api.delete(`/categories/${id}`),
 }
 
 // Inventory
@@ -176,8 +180,67 @@ export const reportAPI = {
   warehouseUtilization: (params) => api.get('/reports/utilization', { params }),
 }
 
+// Users & RBAC
+export const userAPI = {
+  list: (params) => api.get('/users', { params }),
+  show: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  roles: () => api.get('/roles'),
+  permissions: () => api.get('/permissions'),
+}
+
 // Settings
 export const settingAPI = {
   index: () => api.get('/settings'),
   update: (data) => api.put('/settings', data),
 }
+
+// Audit Logs
+export const auditAPI = {
+  list: (params) => api.get('/audit-logs', { params }),
+}
+
+// Documents
+export const documentAPI = {
+  list: (params) => api.get('/documents', { params }),
+  show: (id) => api.get(`/documents/${id}`),
+  upload: (data) => api.post('/documents/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  delete: (id) => api.delete(`/documents/${id}`),
+}
+
+// Zones
+export const zoneAPI = {
+  list: (warehouseId, params) => api.get(`/warehouses/${warehouseId}/zones`, { params }),
+  show: (warehouseId, id) => api.get(`/warehouses/${warehouseId}/zones/${id}`),
+  create: (warehouseId, data) => api.post(`/warehouses/${warehouseId}/zones`, data),
+  update: (warehouseId, id, data) => api.put(`/warehouses/${warehouseId}/zones/${id}`, data),
+  delete: (warehouseId, id) => api.delete(`/warehouses/${warehouseId}/zones/${id}`),
+  activate: (id) => api.put(`/zones/${id}/activate`),
+  deactivate: (id) => api.put(`/zones/${id}/deactivate`),
+}
+
+// Racks (nested under zones)
+export const rackAPI = {
+  list: (zoneId, params) => api.get(`/zones/${zoneId}/racks`, { params }),
+  show: (zoneId, id) => api.get(`/zones/${zoneId}/racks/${id}`),
+  create: (zoneId, data) => api.post(`/zones/${zoneId}/racks`, data),
+  update: (zoneId, id, data) => api.put(`/zones/${zoneId}/racks/${id}`, data),
+  delete: (zoneId, id) => api.delete(`/zones/${zoneId}/racks/${id}`),
+  slots: (id) => api.get(`/racks/${id}/slots`),
+  updatePosition: (id, data) => api.put(`/racks/${id}/position`, data),
+}
+
+// Rack Slots
+export const rackSlotAPI = {
+  list: (params) => api.get('/rack-slots', { params }),
+  show: (id) => api.get(`/rack-slots/${id}`),
+  create: (data) => api.post('/rack-slots', data),
+  update: (id, data) => api.put(`/rack-slots/${id}`, data),
+  delete: (id) => api.delete(`/rack-slots/${id}`),
+  assign: (id, data) => api.put(`/rack-slots/${id}/assign`, data),
+  unassign: (id) => api.put(`/rack-slots/${id}/unassign`),
+  reserve: (id, data) => api.put(`/rack-slots/${id}/reserve`, data),
+}
+

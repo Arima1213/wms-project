@@ -107,7 +107,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('/reports/activity', [ReportController::class, 'activity']);
     Route::post('/reports/export', [ReportController::class, 'export']);
 
-    Route::post('/documents/upload', [DocumentController::class, 'upload']);
+    Route::get('/documents', [DocumentController::class, 'index']);
+Route::post('/documents/upload', [DocumentController::class, 'upload']);
     Route::get('/documents/{document}', [DocumentController::class, 'show']);
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy']);
 

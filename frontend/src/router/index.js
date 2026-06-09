@@ -28,6 +28,11 @@ const routes = [
         component: () => import('../views/Warehouses.vue')
       },
       {
+        path: 'categories',
+        name: 'Categories',
+        component: () => import('../views/Categories.vue')
+      },
+      {
         path: 'products/:id',
         name: 'ProductDetail',
         component: () => import('../views/ProductDetail.vue')
@@ -96,6 +101,26 @@ const routes = [
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/Settings.vue')
+      },
+      {
+        path: 'audit-logs',
+        name: 'AuditLogs',
+        component: () => import('../views/AuditLogs.vue')
+      },
+      {
+        path: 'documents',
+        name: 'Documents',
+        component: () => import('../views/Documents.vue')
+      },
+      {
+        path: 'zones',
+        name: 'Zones',
+        component: () => import('../views/Zones.vue')
+      },
+      {
+        path: 'racks',
+        name: 'Racks',
+        component: () => import('../views/Racks.vue')
       }
     ]
   }

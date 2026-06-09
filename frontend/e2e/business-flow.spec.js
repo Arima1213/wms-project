@@ -115,5 +115,57 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('button:has-text("Kirim (Ship)")');
     await expect(page.locator('text=Status: SHIPPED')).toBeVisible({ timeout: 15000 });
 
+    // 8. Planogram Flow
+    await page.click('a[href="/planograms"]');
+    await expect(page).toHaveURL(/\/planograms/, { timeout: 15000 });
+    
+    // Wait for warehouse data to load
+    await page.waitForTimeout(2000); 
+
+    // Click 'Buat Planogram' main button
+    await page.click('button:has-text("Buat Planogram")');
+    
+    // In the modal, select the warehouse
+    await page.locator('.fixed.inset-0 select').selectOption({ label: 'WH-TEST-001 - Gudang Testing Playwright' });
+    
+    // Fill description
+    await page.fill('input[placeholder="Deskripsi perubahan..."]', 'Initial Planogram Test Playwright');
+    
+    // Click Buat & Edit
+    await page.click('button:has-text("Buat & Edit")');
+
+    // It should navigate to PlanogramEditor
+    await expect(page).toHaveURL(/\/planograms\/\d+/, { timeout: 15000 });
+    await expect(page.locator('text=WH-TEST-001')).toBeVisible({ timeout: 15000 });
+
+    // Search product in left sidebar
+    await page.fill('input[placeholder="Cari nama/SKU/barcode..."]', 'SKU-TEST-999');
+    await expect(page.locator('text=SKU-TEST-999').first()).toBeVisible({ timeout: 15000 });
+
+    // Test creating a Zone using the canvas
+    await page.click('button:has-text("Zone")');
+    
+    // Find the canvas to get its bounding box to click inside it
+    const canvasContainer = page.locator('.konvajs-content');
+    const box = await canvasContainer.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 100, box.y + 100);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 200, box.y + 200);
+      await page.mouse.up();
+    }
+
+    // Save the planogram
+    await page.click('button:has-text("Simpan")');
+    await expect(page.locator('text=Tersimpan')).toBeVisible({ timeout: 15000 });
+
+    // Test Snapshot functionality
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('button:has-text("Snapshot")');
+
+    // Wait for the snapshot process to complete
+    await page.waitForTimeout(2000);
+
   });
 });
+

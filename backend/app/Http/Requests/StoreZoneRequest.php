@@ -18,7 +18,7 @@ class StoreZoneRequest extends FormRequest
 
         return [
             'code' => ['required', 'string', 'max:10', Rule::unique('zones', 'code')->where('warehouse_id', $warehouseId)],
-            'name' => ['required', 'string', 'max:100'],
+            'name' => ['nullable', 'string', 'max:100'],
             'zone_type' => ['nullable', 'string', Rule::in(['fast_moving', 'slow_moving', 'heavy', 'cold', 'hazmat'])],
             'color' => ['nullable', 'string', 'max:7'],
             'temperature_range' => ['nullable', 'array'],

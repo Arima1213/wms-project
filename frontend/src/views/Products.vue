@@ -263,7 +263,7 @@ async function save() {
   try {
     saving.value = true
     const payload = { ...form.value }
-    console.log('Sending payload:', payload);
+    ;
     if (editingId.value) {
       await store.update(editingId.value, payload)
     } else {
