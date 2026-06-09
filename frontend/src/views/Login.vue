@@ -39,9 +39,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI } from '../services/api'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const form = ref({ email: '', password: '' })
 const loading = ref(false)
 const error = ref('')
@@ -50,10 +51,12 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await authAPI.login(form.value)
-    localStorage.setItem('wms_token', res.token)
-    localStorage.setItem('wms_user', JSON.stringify(res.user))
-    router.push('/')
+    const result = await authStore.login(form.value)
+    if (result.success) {
+      router.push('/')
+    } else {
+      error.value = result.message || 'Login gagal'
+    }
   } catch (e) {
     error.value = e.response?.data?.message || 'Login failed. Check your credentials.'
   } finally {

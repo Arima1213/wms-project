@@ -87,50 +87,91 @@ class InventoryService
     /**
      * Decrease inventory stock and record a GI (Goods Issue) transaction.
      *
+     * Uses FIFO (First In, First Out) or FEFO (First Expiry, First Out) strategy
+     * to pick stock from the oldest batches first, creating one stock movement
+     * record per inventory batch consumed.
+     *
      * @param int $productId
      * @param int $warehouseId
      * @param float $quantity
      * @param int $userId
-     * @param array $options [reference_type, reference_id, reference_number, notes]
-     * @return Inventory|null
-     * @throws \Exception
+     * @param array $options [strategy, reference_type, reference_id, reference_number, notes]
+     *                       strategy: 'fifo' (default) or 'fefo'
+     * @return array<int, StockTransaction> Array of movement records (one per inventory batch)
+     * @throws InsufficientStockException
      */
-    public function issueStock(int $productId, int $warehouseId, float $quantity, int $userId, array $options = []): ?Inventory
+    public function issueStock(int $productId, int $warehouseId, float $quantity, int $userId, array $options = []): array
     {
-        $inventory = Inventory::where([
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-        ])->first();
+        $strategy = $options['strategy'] ?? 'fifo';
 
-        if (!$inventory || $inventory->quantity < $quantity) {
-            throw new \Exception("Insufficient stock for product ID {$productId} in warehouse {$warehouseId}");
+        // Ambil semua inventory records yang masih punya stok
+        $query = Inventory::where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('quantity', '>', 0);
+
+        if ($strategy === 'fefo') {
+            // FEFO: item dengan expiry terdekat duluan, lalu yang paling lama diterima
+            $query->orderByRaw('expiry_date ASC NULLS LAST')
+                  ->orderBy('created_at', 'ASC')
+                  ->orderBy('id', 'ASC');
+        } else {
+            // FIFO (default): item paling lama diterima duluan
+            $query->orderBy('created_at', 'ASC')
+                  ->orderBy('id', 'ASC');
         }
 
-        $stockBefore = $inventory->quantity;
-        
-        $inventory->quantity -= $quantity;
-        $inventory->available_quantity -= $quantity;
-        $inventory->save();
+        $records = $query->get();
 
-        StockTransaction::create([
-            'ulid' => (string) Str::ulid(),
-            'transaction_type' => 'GI',
-            'transactionable_type' => $options['reference_type'] ?? null,
-            'transactionable_id' => $options['reference_id'] ?? null,
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-            'source_warehouse_id' => $warehouseId,
-            'quantity' => $quantity,
-            'quantity_in_base_uom' => $quantity,
-            'stock_before' => $stockBefore,
-            'stock_after' => $inventory->quantity,
-            'reference_number' => $options['reference_number'] ?? null,
-            'notes' => $options['notes'] ?? 'Stock Issued',
-            'created_by' => $userId,
-            'created_at' => now(),
-        ]);
+        $totalAvailable = $records->sum('quantity');
+        if ($totalAvailable < $quantity) {
+            throw new InsufficientStockException(
+                "Insufficient stock for product ID {$productId} in warehouse {$warehouseId}. "
+                    . "Requested: {$quantity}, Available: {$totalAvailable}",
+                $productId,
+                $warehouseId,
+                $quantity,
+                $totalAvailable
+            );
+        }
 
-        return $inventory;
+        $remainingQty = $quantity;
+        $movements = [];
+
+        foreach ($records as $inventory) {
+            if ($remainingQty <= 0) {
+                break;
+            }
+
+            $taken = min($inventory->quantity, $remainingQty);
+            $stockBefore = $inventory->quantity;
+
+            $inventory->quantity -= $taken;
+            $inventory->available_quantity -= $taken;
+            $inventory->save();
+
+            $movements[] = StockTransaction::create([
+                'ulid' => (string) Str::ulid(),
+                'transaction_type' => 'GI',
+                'transactionable_type' => $options['reference_type'] ?? null,
+                'transactionable_id' => $options['reference_id'] ?? null,
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'source_warehouse_id' => $warehouseId,
+                'batch_id' => null,
+                'quantity' => $taken,
+                'quantity_in_base_uom' => $taken,
+                'stock_before' => $stockBefore,
+                'stock_after' => $inventory->quantity,
+                'reference_number' => $options['reference_number'] ?? null,
+                'notes' => $options['notes'] ?? 'Stock Issued',
+                'created_by' => $userId,
+                'created_at' => now(),
+            ]);
+
+            $remainingQty -= $taken;
+        }
+
+        return $movements;
     }
 
     /**

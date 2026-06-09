@@ -26,7 +26,7 @@ class InboundService
      */
     public function receive(Inbound $inbound, int $userId, ?array $items = null): Inbound
     {
-        if ($inbound->status !== 'pending') {
+        if (in_array($inbound->status, ['received', 'cancelled'])) {
             throw new \Exception('Inbound already received or cancelled.');
         }
 
@@ -35,11 +35,99 @@ class InboundService
             $inbound->loadMissing('items');
 
             if ($items === null) {
-                // Full receive — existing behavior
-                $this->fullReceive($inbound, $userId);
+                // Full receive
+                foreach ($inbound->items as $item) {
+                    $item->update([
+                        'received_qty' => $item->expected_qty,
+                        'received_at' => now(),
+                    ]);
+
+                    $this->inventoryService->receiveStock(
+                        $item->product_id,
+                        $inbound->warehouse_id,
+                        $item->expected_qty,
+                        $userId,
+                        [
+                            'batch_number' => $item->batch_number,
+                            'expiry_date' => $item->expiry_date,
+                            'reference_type' => 'App\\Models\\Inbound',
+                            'reference_id' => $inbound->id,
+                            'reference_number' => $inbound->inbound_number,
+                            'notes' => 'Received from inbound ' . $inbound->inbound_number,
+                        ]
+                    );
+                }
+
+                $inbound->update([
+                    'status' => 'received',
+                    'received_date' => now(),
+                ]);
             } else {
                 // Partial receive
-                $this->partialReceive($inbound, $userId, $items);
+                $wasPending = $inbound->status === 'pending';
+
+                foreach ($items as $itemData) {
+                    $item = InboundItem::find($itemData['id']);
+                    if (!$item) {
+                        continue;
+                    }
+
+                    if ($itemData['received_qty'] > $item->expected_qty) {
+                        throw new \Exception("Received quantity cannot exceed expected quantity for item ID {$item->id}");
+                    }
+
+                    $additional_qty = $itemData['received_qty'] - $item->received_qty;
+
+                    $item->update([
+                        'received_qty' => $itemData['received_qty'],
+                        'received_at' => now(),
+                    ]);
+
+                    if ($additional_qty > 0) {
+                        $this->inventoryService->receiveStock(
+                            $item->product_id,
+                            $inbound->warehouse_id,
+                            $additional_qty,
+                            $userId,
+                            [
+                                'batch_number' => $item->batch_number,
+                                'expiry_date' => $item->expiry_date,
+                                'reference_type' => 'App\\Models\\Inbound',
+                                'reference_id' => $inbound->id,
+                                'reference_number' => $inbound->inbound_number,
+                                'notes' => 'Received from inbound ' . $inbound->inbound_number,
+                            ]
+                        );
+                    }
+                }
+
+                $inbound->load('items');
+
+                $everyItemFull = true;
+                $anyItemPartial = false;
+
+                foreach ($inbound->items as $item) {
+                    if ($item->received_qty < $item->expected_qty) {
+                        $everyItemFull = false;
+                    }
+                    if ($item->received_qty > 0) {
+                        $anyItemPartial = true;
+                    }
+                }
+
+                $newStatus = $inbound->status;
+                if ($everyItemFull) {
+                    $newStatus = 'received';
+                } elseif ($anyItemPartial) {
+                    $newStatus = 'partial';
+                }
+
+                $updateData = ['status' => $newStatus];
+                if ($wasPending && $newStatus !== 'pending') {
+                    $updateData['received_date'] = now();
+                }
+
+                $inbound->update($updateData);
             }
 
             DB::commit();
@@ -48,117 +136,5 @@ class InboundService
             DB::rollBack();
             throw $e;
         }
-    }
-
-    /**
-     * Full receive: all items received at expected_qty.
-     */
-    protected function fullReceive(Inbound $inbound, int $userId): void
-    {
-        $inbound->update([
-            'status' => 'received',
-            'received_date' => now(),
-        ]);
-
-        foreach ($inbound->items as $item) {
-            $item->update(['received_qty' => $item->expected_qty, 'received_at' => now()]);
-
-            $this->inventoryService->receiveStock(
-                $item->product_id,
-                $inbound->warehouse_id,
-                $item->expected_qty,
-                $userId,
-                [
-                    'batch_number' => $item->batch_number,
-                    'expiry_date' => $item->expiry_date,
-                    'reference_type' => 'App\\Models\\Inbound',
-                    'reference_id' => $inbound->id,
-                    'reference_number' => $inbound->inbound_number,
-                    'notes' => 'Received from inbound ' . $inbound->inbound_number,
-                ]
-            );
-        }
-    }
-
-    /**
-     * Partial receive: only specified items with given received_qty.
-     *
-     * @param array $items Array of ['id' => int, 'received_qty' => float]
-     */
-    protected function partialReceive(Inbound $inbound, int $userId, array $items): void
-    {
-        $specifiedItemIds = collect($items)->pluck('id')->toArray();
-
-        foreach ($items as $input) {
-            /** @var InboundItem|null $item */
-            $item = $inbound->items->firstWhere('id', $input['id']);
-
-            if (! $item) {
-                throw new \Exception("Item ID {$input['id']} not found in this inbound document.");
-            }
-
-            $newQty = (float) $input['received_qty'];
-
-            if ($newQty > $item->expected_qty) {
-                throw new \Exception(
-                    "Received qty ({$newQty}) for item ID {$item->id} cannot exceed expected qty ({$item->expected_qty})."
-                );
-            }
-
-            if ($newQty < 0) {
-                throw new \Exception('Received qty cannot be negative.');
-            }
-
-            $additionalQty = $newQty - (float) $item->received_qty;
-
-            if ($additionalQty < 0) {
-                throw new \Exception(
-                    "Cannot reduce received qty for item ID {$item->id}. Current: {$item->received_qty}, new: {$newQty}."
-                );
-            }
-
-            // Only update if something actually changed
-            if ($additionalQty > 0) {
-                $item->update([
-                    'received_qty' => $newQty,
-                    'received_at' => now(),
-                ]);
-
-                $this->inventoryService->receiveStock(
-                    $item->product_id,
-                    $inbound->warehouse_id,
-                    $additionalQty,
-                    $userId,
-                    [
-                        'batch_number' => $item->batch_number,
-                        'expiry_date' => $item->expiry_date,
-                        'reference_type' => 'App\\Models\\Inbound',
-                        'reference_id' => $inbound->id,
-                        'reference_number' => $inbound->inbound_number,
-                        'notes' => 'Received from inbound ' . $inbound->inbound_number,
-                    ]
-                );
-            }
-        }
-
-        // Determine overall inbound status
-        $inbound->refresh();
-        $inbound->load('items');
-
-        $allFull = $inbound->items->every(fn ($i) => (float) $i->received_qty >= (float) $i->expected_qty);
-        $anyReceived = $inbound->items->some(fn ($i) => (float) $i->received_qty > 0);
-
-        if ($allFull) {
-            $inbound->update([
-                'status' => 'received',
-                'received_date' => $inbound->received_date ?? now(),
-            ]);
-        } elseif ($anyReceived) {
-            $inbound->update([
-                'status' => 'partial',
-                'received_date' => $inbound->received_date ?? now(),
-            ]);
-        }
-        // If none received, stay 'pending' (no update needed)
     }
 }

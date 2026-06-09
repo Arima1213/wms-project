@@ -55,6 +55,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import {
   HomeIcon,
   BuildingOfficeIcon,
@@ -75,7 +76,9 @@ import {
 const route = useRoute()
 const router = useRouter()
 
-const user = computed(() => JSON.parse(localStorage.getItem('wms_user') || '{}'))
+const authStore = useAuthStore()
+
+const user = computed(() => authStore.user || {})
 const userInitials = computed(() => {
   const name = user.value.name || 'U'
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -109,8 +112,7 @@ const isActive = (path) => {
 }
 
 const logout = () => {
-  localStorage.removeItem('wms_token')
-  localStorage.removeItem('wms_user')
+  authStore.logout()
   router.push('/login')
 }
 </script>
