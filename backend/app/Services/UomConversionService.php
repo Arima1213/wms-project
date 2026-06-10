@@ -71,6 +71,58 @@ class UomConversionService
     }
 
     /**
+     * Convert quantity to base UOM using UOM ID, with optional product-specific conversion.
+     *
+     * @param float $quantity
+     * @param int $uomId
+     * @param int|null $productId Optional product-specific conversion
+     * @return float
+     * @throws \Exception
+     */
+    public function getBaseQuantity(float $quantity, int $uomId, ?int $productId = null): float
+    {
+        if ($quantity == 0) {
+            return 0;
+        }
+
+        // Check product-specific conversion first
+        if ($productId !== null) {
+            $productConv = UomConversion::where('product_id', $productId)
+                ->where('from_uom_id', $uomId)
+                ->first();
+
+            if ($productConv) {
+                return round($quantity * $productConv->conversion_factor, 4);
+            }
+        }
+
+        // Fall back to global UOM tree
+        $uom = Uom::find($uomId);
+        if (!$uom) {
+            throw new \Exception("UOM not found: ID {$uomId}");
+        }
+
+        return $this->toBaseQuantity($quantity, $uom);
+    }
+
+    /**
+     * Convert quantity to base UOM and return both the value and base UOM ID.
+     *
+     * @param float $quantity
+     * @param int $uomId
+     * @param int|null $productId
+     * @return array{quantity: float, base_uom_id: int}
+     * @throws \Exception
+     */
+    public function getBaseUomWithConversion(float $quantity, int $uomId, ?int $productId = null): array
+    {
+        return [
+            'quantity' => $this->getBaseQuantity($quantity, $uomId, $productId),
+            'base_uom_id' => $this->getBaseUomId($uomId),
+        ];
+    }
+
+    /**
      * Convert quantity to the base UOM quantity by traversing the base_uom tree.
      *
      * @param float $quantity
