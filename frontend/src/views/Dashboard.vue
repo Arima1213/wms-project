@@ -52,6 +52,9 @@
           <button class="text-xs text-blue-600 font-medium hover:underline">Lihat Rincian</button>
         </div>
         <div class="space-y-5">
+          <div v-if="stockSummary.length === 0" class="text-center py-6 text-gray-400 text-sm">
+            Belum ada data ringkasan stok.
+          </div>
           <div v-for="item in stockSummary" :key="item.name" class="relative">
             <div class="flex justify-between text-sm mb-1.5">
               <span class="font-medium text-gray-700">{{ item.name }}</span>
@@ -139,10 +142,10 @@ const currentTime = ref(new Date().toLocaleTimeString('id-ID', { hour: '2-digit'
 const stats = computed(() => {
   const m = store.metrics || {}
   return [
-    { label: 'Total Produk Aktif', value: m.total_products || '1,248', subtitle: 'SKU terdaftar', icon: CubeIcon, color: 'bg-blue-100 text-blue-600', glowColor: 'bg-blue-500', trendUp: true },
-    { label: 'Inbound Hari Ini', value: m.inbound_today || '24', subtitle: 'transaksi penerimaan', icon: ArrowUpCircleIcon, color: 'bg-emerald-100 text-emerald-600', glowColor: 'bg-emerald-500', trendUp: true },
-    { label: 'Outbound Hari Ini', value: m.outbound_today || '18', subtitle: 'transaksi pengiriman', icon: ArrowDownCircleIcon, color: 'bg-orange-100 text-orange-600', glowColor: 'bg-orange-500', trendUp: false },
-    { label: 'Peringatan Stok', value: m.low_stock || '8', subtitle: 'butuh restock segera', icon: ExclamationTriangleIcon, color: 'bg-rose-100 text-rose-600', glowColor: 'bg-rose-500', trendUp: false },
+    { label: 'Total Produk Aktif', value: m.total_products ?? '—', subtitle: 'SKU terdaftar', icon: CubeIcon, color: 'bg-blue-100 text-blue-600', glowColor: 'bg-blue-500', trendUp: true },
+    { label: 'Inbound Hari Ini', value: m.inbound_today ?? '—', subtitle: 'transaksi penerimaan', icon: ArrowUpCircleIcon, color: 'bg-emerald-100 text-emerald-600', glowColor: 'bg-emerald-500', trendUp: true },
+    { label: 'Outbound Hari Ini', value: m.outbound_today ?? '—', subtitle: 'transaksi pengiriman', icon: ArrowDownCircleIcon, color: 'bg-orange-100 text-orange-600', glowColor: 'bg-orange-500', trendUp: false },
+    { label: 'Peringatan Stok', value: m.low_stock ?? '—', subtitle: 'butuh restock segera', icon: ExclamationTriangleIcon, color: 'bg-rose-100 text-rose-600', glowColor: 'bg-rose-500', trendUp: false },
   ]
 })
 
@@ -160,12 +163,7 @@ const stockSummary = computed(() => {
       { name: 'Tidak Aktif', value: 5, color: 'bg-gray-300' },
     ]
   }
-  return [
-    { name: 'Tersedia (Available)', value: 72, color: 'bg-emerald-500' },
-    { name: 'Dipesan (Reserved)', value: 18, color: 'bg-blue-500' },
-    { name: 'Karantina (Quarantine)', value: 7, color: 'bg-amber-500' },
-    { name: 'Rusak (Damaged)', value: 3, color: 'bg-rose-500' },
-  ]
+  return []
 })
 
 const warehouseUtil = computed(() => {
@@ -177,10 +175,7 @@ const warehouseUtil = computed(() => {
       percent: Math.round((wh.used_capacity / wh.total_capacity) * 100) || 0
     }))
   }
-  return [
-    { name: 'WH001 - Gudang Utama', used: 7200, total: 10000, percent: 72 },
-    { name: 'WH002 - Gudang Pendingin SBY', used: 4100, total: 5000, percent: 82 },
-  ]
+  return []
 })
 
 const recentActivities = computed(() => {
@@ -194,12 +189,7 @@ const recentActivities = computed(() => {
       iconColor: a.type === 'inbound' ? 'bg-emerald-100 text-emerald-600' : a.type === 'outbound' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
     }))
   }
-  return [
-    { id: 1, title: 'Penerimaan Inbound #INB-2024-0042', desc: 'Kabel USB Type-C x200 dari PT Elektronik Jaya diterima di Gudang Utama.', time: '10 mnt yang lalu', icon: ArrowUpCircleIcon, iconColor: 'bg-emerald-100 text-emerald-600' },
-    { id: 2, title: 'Pengiriman Outbound #OUT-2024-0038', desc: 'Adapter Listrik x50 diberangkatkan ke Toko Elektronik Bandung.', time: '45 mnt yang lalu', icon: ArrowDownCircleIcon, iconColor: 'bg-orange-100 text-orange-600' },
-    { id: 3, title: 'Transfer Stok Internal WH001 -> WH002', desc: 'Plastik PE 0.5mm x50kg dipindahkan dan disetujui.', time: '1 jam yang lalu', icon: CubeIcon, iconColor: 'bg-blue-100 text-blue-600' },
-    { id: 4, title: 'Peringatan Stok Menipis', desc: 'Kotak Kardon 30x30x30 menyentuh batas Reorder Point (Sisa: 10).', time: '2 jam yang lalu', icon: ExclamationTriangleIcon, iconColor: 'bg-rose-100 text-rose-600' },
-  ]
+  return []
 })
 
 function formatNumber(num) {

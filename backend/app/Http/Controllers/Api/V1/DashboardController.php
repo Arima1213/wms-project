@@ -54,8 +54,19 @@ class DashboardController extends Controller
         ]);
 
         // Recent transactions
-        $recentTx = StockTransaction::with(['product:id,name,sku', 'user:id,name', 'warehouse:id,name'])
-            ->orderByDesc('created_at')->limit(10)->get();
+        $recentTx = StockTransaction::with(['product:id,name,sku', 'creator:id,name', 'warehouse:id,name'])
+            ->orderByDesc('created_at')->limit(10)->get()
+            ->map(function ($tx) {
+                return [
+                    'id' => $tx->id,
+                    'type' => $tx->transaction_type,
+                    'reference' => $tx->reference_number,
+                    'user' => $tx->creator?->name,
+                    'description' => $tx->product?->name ?? $tx->notes,
+                    'quantity' => $tx->quantity,
+                    'created_at' => $tx->created_at,
+                ];
+            });
 
         return response()->json([
             'data' => [

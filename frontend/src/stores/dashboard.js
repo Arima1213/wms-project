@@ -41,16 +41,31 @@ export const useDashboardStore = defineStore('dashboard', {
         const transactions = data.recent_transactions || []
         this.recentActivity = transactions.map(tx => {
           let iconColor = 'text-gray-500 bg-gray-100'
-          if (tx.type === 'inbound') iconColor = 'text-green-500 bg-green-100'
-          else if (tx.type === 'outbound') iconColor = 'text-blue-500 bg-blue-100'
-          else if (tx.type === 'transfer') iconColor = 'text-purple-500 bg-purple-100'
+          let parsedType = 'other'
+          const rawType = (tx.type || '').toUpperCase()
           
+          if (rawType === 'GR' || rawType === 'INBOUND') {
+            iconColor = 'text-green-500 bg-green-100'
+            parsedType = 'inbound'
+          } else if (rawType === 'GI' || rawType === 'OUTBOUND') {
+            iconColor = 'text-blue-500 bg-blue-100'
+            parsedType = 'outbound'
+          } else if (rawType === 'TR' || rawType === 'TRANSFER') {
+            iconColor = 'text-purple-500 bg-purple-100'
+            parsedType = 'transfer'
+          }
+          
+          let descText = tx.description ? `${tx.description} (${Number(tx.quantity)} unit)` : `${Number(tx.quantity)} unit`
+          if (tx.user) {
+            descText += ` oleh ${tx.user}`
+          }
+
           return {
             id: tx.id,
-            title: `${tx.type} #${tx.reference}`,
-            desc: tx.description || `${tx.quantity} unit`,
+            title: `${rawType} #${tx.reference || '-'}`,
+            desc: descText,
             time: getTimeElapsed(tx.created_at),
-            type: tx.type,
+            type: parsedType,
             iconColor
           }
         })

@@ -41,6 +41,7 @@
       <header class="bg-white border-b px-6 py-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold text-gray-800">{{ pageTitle }}</h2>
         <div class="flex items-center gap-4">
+          <NotificationBell />
           <span class="text-sm text-gray-500">{{ currentDate }}</span>
         </div>
       </header>
@@ -56,6 +57,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import NotificationBell from '../components/notification/NotificationBell.vue'
 import {
   HomeIcon,
   BuildingOfficeIcon,
@@ -65,6 +67,7 @@ import {
   ArrowDownCircleIcon,
   ClipboardDocumentListIcon,
   MapIcon,
+  BellIcon,
   ChartBarIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
@@ -96,6 +99,7 @@ const menuItems = [
   { to: '/transfers', label: 'Transfer Stok', icon: ArrowUpCircleIcon },
   { to: '/planograms', label: 'Planogram', icon: MapIcon },
   { to: '/reports', label: 'Laporan', icon: ChartBarIcon },
+  { to: '/notifications', label: 'Notifikasi', icon: BellIcon },
   { to: '/zones', label: 'Zona', icon: MapPinIcon },
   { to: '/racks', label: 'Rak & Slot', icon: ServerStackIcon },
   { to: '/documents', label: 'Dokumen', icon: DocumentTextIcon },

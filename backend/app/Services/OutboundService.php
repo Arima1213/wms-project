@@ -58,6 +58,15 @@ class OutboundService
             }
 
             DB::commit();
+
+            // Notify users about shipped outbound
+            app(NotificationService::class)->notifyUsers(
+                type: 'outbound_shipped',
+                title: 'Outbound Shipped',
+                message: "Outbound {$outbound->outbound_number} has been successfully shipped.",
+                data: ['outbound_id' => $outbound->id, 'outbound_number' => $outbound->outbound_number]
+            );
+
             return $outbound;
         } catch (\Exception $e) {
             DB::rollBack();

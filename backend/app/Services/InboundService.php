@@ -134,6 +134,15 @@ class InboundService
             }
 
             DB::commit();
+
+            // Notify users about received inbound
+            app(NotificationService::class)->notifyUsers(
+                type: 'inbound_received',
+                title: 'Inbound Received',
+                message: "Inbound {$inbound->inbound_number} has been successfully received.",
+                data: ['inbound_id' => $inbound->id, 'inbound_number' => $inbound->inbound_number]
+            );
+
             return $inbound->fresh()->load('items');
         } catch (\Exception $e) {
             DB::rollBack();

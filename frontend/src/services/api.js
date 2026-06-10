@@ -193,6 +193,14 @@ export const auditAPI = {
   list: (params) => api.get('/audit-logs', { params }),
 }
 
+// Notifications
+export const notificationAPI = {
+  index: (params) => api.get('/notifications', { params }),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
+}
+
 // Documents
 export const documentAPI = {
   list: (params) => api.get('/documents', { params }),

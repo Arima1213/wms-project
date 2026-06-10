@@ -35,7 +35,7 @@ class NotificationService
     /**
      * Notify users
      */
-    protected function notifyUsers(string $type, string $title, string $message, array $data = []): bool
+    public function notifyUsers(string $type, string $title, string $message, array $data = []): bool
     {
         $users = $this->getUsersToNotify();
         $notifications = [];
