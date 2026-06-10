@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\StockOpname;
+use App\Http\Resources\StockOpnameResource;
 use App\Services\DocumentSequenceService;
 use App\Services\StockOpnameService;
 use Illuminate\Http\JsonResponse;
@@ -21,9 +22,9 @@ class StockOpnameController extends Controller
         $this->documentSequence = $documentSequence;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = StockOpname::with('warehouse', 'user');
+        $query = StockOpname::with(['warehouse', 'user', 'zone']);
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -31,13 +32,13 @@ class StockOpnameController extends Controller
             $query->where('warehouse_id', $request->warehouse_id);
         }
         $opnames = $query->orderByDesc('created_at')->paginate($request->get('per_page', 25));
-        return response()->json($opnames);
+        return StockOpnameResource::collection($opnames);
     }
 
-    public function show(string|int $opname): JsonResponse
+    public function show(string|int $opname): StockOpnameResource
     {
-        $opname = StockOpname::with(['warehouse', 'user', 'items.product'])->findOrFail($opname);
-        return response()->json(['data' => $opname]);
+        $opname = StockOpname::with(['warehouse', 'user', 'zone', 'items.product', 'items.slot'])->findOrFail($opname);
+        return new StockOpnameResource($opname);
     }
 
     public function store(Request $request): JsonResponse
@@ -60,7 +61,7 @@ class StockOpnameController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
-        return response()->json(['data' => $opname], 201);
+        return response()->json(['data' => new StockOpnameResource($opname->load('warehouse', 'user'))], 201);
     }
 
     public function start(Request $request, string|int $opname): JsonResponse
@@ -72,7 +73,7 @@ class StockOpnameController extends Controller
             return response()->json(['message' => 'Cannot start this stock opname'], 422);
         }
         $opname->update(['status' => 'in_progress']);
-        return response()->json(['data' => $opname]);
+        return response()->json(['data' => new StockOpnameResource($opname->load('warehouse', 'user'))]);
     }
 
     public function update(Request $request, string|int $opnameId): JsonResponse
@@ -113,7 +114,7 @@ class StockOpnameController extends Controller
                 }
             }
             DB::commit();
-            return response()->json(['data' => $opname->load('items')]);
+            return response()->json(['data' => new StockOpnameResource($opname->load('items.product', 'warehouse', 'user'))]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to update stock opname', 'error' => $e->getMessage()], 500);
@@ -129,7 +130,7 @@ class StockOpnameController extends Controller
             return response()->json(['message' => 'Cannot submit this stock opname'], 422);
         }
         $opname->update(['status' => 'submitted', 'submitted_at' => now()]);
-        return response()->json(['data' => $opname]);
+        return response()->json(['data' => new StockOpnameResource($opname->load('warehouse', 'user'))]);
     }
 
     public function approve(Request $request, string|int $opnameId): JsonResponse
@@ -139,7 +140,7 @@ class StockOpnameController extends Controller
         
         try {
             $approvedOpname = $this->stockOpnameService->approve($opname, $request->user()->id);
-            return response()->json(['data' => $approvedOpname]);
+            return response()->json(['data' => new StockOpnameResource($approvedOpname->load(['warehouse', 'user', 'zone', 'items.product']))]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }

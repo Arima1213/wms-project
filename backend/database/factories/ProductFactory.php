@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\Category;
+use App\Models\ProductCategory;
 use App\Models\Uom;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -12,7 +12,7 @@ class ProductFactory extends Factory
 
     public function definition(): array
     {
-        $category = Category::inRandomOrder()->first() ?? Category::factory();
+        $category = ProductCategory::inRandomOrder()->first() ?? ProductCategory::factory();
         $uom = Uom::inRandomOrder()->first() ?? Uom::factory();
 
         return [

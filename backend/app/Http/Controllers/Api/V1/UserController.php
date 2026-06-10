@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $query = User::query()->with('roles:id,name');
         if ($request->has('search')) {
@@ -18,7 +19,7 @@ class UserController extends Controller
                   ->orWhere('email', 'ilike', '%' . $request->search . '%');
         }
         $data = $query->paginate($request->get('per_page', 15));
-        return response()->json($data);
+        return UserResource::collection($data);
     }
 
     public function store(Request $request): JsonResponse
@@ -43,13 +44,13 @@ class UserController extends Controller
             $user->assignRole($validated['roles']);
         }
 
-        return response()->json(['data' => $user->load('roles')], 201);
+        return response()->json(['data' => new UserResource($user->load('roles'))], 201);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(int $id): UserResource
     {
         $user = User::with('roles:id,name', 'permissions:id,name')->findOrFail($id);
-        return response()->json(['data' => $user]);
+        return new UserResource($user);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -70,7 +71,7 @@ class UserController extends Controller
             $user->syncRoles($validated['roles']);
         }
 
-        return response()->json(['data' => $user->load('roles')]);
+        return response()->json(['data' => new UserResource($user->load('roles'))]);
     }
 
     public function destroy(int $id): JsonResponse

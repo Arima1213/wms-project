@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AuditLogResource;
 use App\Models\AuditLog;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $query = AuditLog::with('user:id,name')
             ->when($request->entity_type, fn($q) => $q->where('entity_type', $request->entity_type))
@@ -19,6 +19,6 @@ class AuditLogController extends Controller
             ->orderByDesc('created_at');
 
         $data = $query->paginate($request->get('per_page', 50));
-        return response()->json($data);
+        return AuditLogResource::collection($data);
     }
 }

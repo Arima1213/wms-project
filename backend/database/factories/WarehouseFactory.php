@@ -17,21 +17,25 @@ class WarehouseFactory extends Factory
             'address' => fake()->address(),
             'city' => fake()->city(),
             'province' => fake()->state(),
-            'country' => 'Indonesia',
             'postal_code' => fake()->postcode(),
-            'phone' => fake()->phoneNumber(),
-            'email' => fake()->companyEmail(),
             'latitude' => fake()->latitude(-8, -6),
             'longitude' => fake()->longitude(106, 115),
-            'description' => fake()->sentence(),
+            'capacity_m2' => fake()->randomFloat(2, 100, 10000),
+            'pic_name' => fake()->name(),
+            'pic_phone' => fake()->phoneNumber(),
+            'pic_email' => fake()->companyEmail(),
+            'warehouse_type' => fake()->randomElement(['reguler', 'cold_storage', 'bonded', 'konsinyasi']),
             'is_active' => true,
-            'metadata' => null,
-            'created_by' => 1,
         ];
     }
 
     public function inactive(): static
     {
         return $this->state(fn(array $attributes) => ['is_active' => false]);
+    }
+
+    public function coldStorage(): static
+    {
+        return $this->state(fn(array $attributes) => ['warehouse_type' => 'cold_storage']);
     }
 }

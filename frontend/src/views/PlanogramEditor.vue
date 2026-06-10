@@ -27,6 +27,22 @@
 
       <div class="h-5 w-px bg-gray-200"></div>
 
+      <!-- Zoom controls -->
+      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+        <button @click="zoomOut" class="px-2 py-1 rounded hover:bg-white text-gray-600 hover:text-gray-800 text-sm" title="Perkecil">
+          <MinusIcon class="w-4 h-4" />
+        </button>
+        <span class="px-2 text-xs font-mono text-gray-500 min-w-[48px] text-center">{{ Math.round(zoomLevel * 100) }}%</span>
+        <button @click="zoomIn" class="px-2 py-1 rounded hover:bg-white text-gray-600 hover:text-gray-800 text-sm" title="Perbesar">
+          <PlusIcon class="w-4 h-4" />
+        </button>
+        <button @click="zoomFit" class="px-2 py-1 rounded hover:bg-white text-gray-600 hover:text-gray-800 text-sm" title="Sesuaikan">
+          <ArrowPathIcon class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="h-5 w-px bg-gray-200"></div>
+
       <!-- Grid snap -->
       <label class="flex items-center gap-2 text-sm text-gray-600">
         <input type="checkbox" v-model="gridSnap" class="rounded" />
@@ -398,7 +414,9 @@ import {
   TrashIcon,
   CursorArrowRaysIcon,
   RectangleStackIcon,
-  ViewfinderCircleIcon
+  ViewfinderCircleIcon,
+  MinusIcon,
+  PlusIcon,
 } from '@heroicons/vue/24/outline'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
@@ -417,6 +435,7 @@ const canvasWidth = ref(800)
 const canvasHeight = ref(600)
 const gridSize = ref(20)
 const gridSnap = ref(true)
+const zoomLevel = ref(1)
 const stageRef = ref(null)
 const canvasContainer = ref(null)
 
@@ -464,7 +483,26 @@ const bgConfig = computed(() => ({
 const canvasContainerStyle = computed(() => ({
   width: canvasWidth.value + 'px',
   height: canvasHeight.value + 'px',
+  transform: `scale(${zoomLevel.value})`,
+  transformOrigin: '0 0',
 }))
+
+function zoomIn() {
+  zoomLevel.value = Math.min(zoomLevel.value + 0.25, 3)
+}
+
+function zoomOut() {
+  zoomLevel.value = Math.max(zoomLevel.value - 0.25, 0.25)
+}
+
+function zoomFit() {
+  const container = canvasContainer.value?.parentElement
+  if (!container) return
+  const pad = 40
+  const sx = (container.clientWidth - pad) / canvasWidth.value
+  const sy = (container.clientHeight - pad) / canvasHeight.value
+  zoomLevel.value = Math.min(sx, sy, 1)
+}
 
 const gridOverlayStyle = computed(() => {
   const size = gridSize.value
@@ -826,6 +864,7 @@ function formatTime(date) {
 // Handle dragover on canvas for product drop
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown)
+  canvasContainer.value?.parentElement?.addEventListener('wheel', handleWheel, { passive: false })
 
   // Load warehouse + planogram
   try {
@@ -833,11 +872,21 @@ onMounted(async () => {
     warehouse.value = whRes.data || whRes
   } catch {}
   await loadPlanogram()
+  setTimeout(zoomFit, 100)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  canvasContainer.value?.parentElement?.removeEventListener('wheel', handleWheel)
   clearTimeout(autoSaveTimer)
   if (hasChanges.value) savePlanogram()
 })
+
+function handleWheel(e) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -0.1 : 0.1
+    zoomLevel.value = Math.max(0.25, Math.min(3, zoomLevel.value + delta))
+  }
+}
 </script>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Outbound;
 use App\Http\Requests\StoreOutboundRequest;
 use App\Http\Requests\UpdateOutboundRequest;
+use App\Http\Resources\OutboundResource;
 use App\Services\DocumentSequenceService;
 use App\Services\OutboundService;
 use Illuminate\Http\JsonResponse;
@@ -23,9 +24,9 @@ class OutboundController extends Controller
         $this->documentSequence = $documentSequence;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = Outbound::with('warehouse', 'user');
+        $query = Outbound::with(['warehouse', 'user', 'items.product']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -35,13 +36,13 @@ class OutboundController extends Controller
         }
 
         $outbounds = $query->orderByDesc('created_at')->paginate($request->get('per_page', 25));
-        return response()->json($outbounds);
+        return OutboundResource::collection($outbounds);
     }
 
-    public function show(string|int $outbound): JsonResponse
+    public function show(string|int $outbound): OutboundResource
     {
         $outbound = Outbound::with(['warehouse', 'user', 'items.product'])->findOrFail($outbound);
-        return response()->json(['data' => $outbound]);
+        return new OutboundResource($outbound);
     }
 
     public function store(StoreOutboundRequest $request): JsonResponse
@@ -76,7 +77,7 @@ class OutboundController extends Controller
             }
 
             DB::commit();
-            return response()->json(['data' => $outbound->load('items')], 201);
+            return response()->json(['data' => new OutboundResource($outbound->load('items.product', 'warehouse', 'user'))], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to create outbound', 'error' => $e->getMessage()], 500);
@@ -87,7 +88,7 @@ class OutboundController extends Controller
     {
         $outbound = Outbound::findOrFail($outbound);
         $outbound->update($request->validated());
-        return response()->json(['data' => $outbound]);
+        return response()->json(['data' => new OutboundResource($outbound->fresh(['warehouse', 'user']))]);
     }
 
     public function destroy(string|int $outbound): JsonResponse
@@ -109,7 +110,7 @@ class OutboundController extends Controller
             return response()->json(['message' => 'Outbound already picked'], 422);
         }
         $outbound->update(['status' => 'picking']);
-        return response()->json(['data' => $outbound]);
+        return response()->json(['data' => new OutboundResource($outbound->fresh(['warehouse', 'user']))]);
     }
 
     public function ship(Request $request, string|int $outboundId): JsonResponse
@@ -119,7 +120,7 @@ class OutboundController extends Controller
         
         try {
             $shippedOutbound = $this->outboundService->ship($outbound, $request->user()->id);
-            return response()->json(['data' => $shippedOutbound]);
+            return response()->json(['data' => new OutboundResource($shippedOutbound->load(['warehouse', 'user', 'items.product']))]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -134,6 +135,6 @@ class OutboundController extends Controller
             return response()->json(['message' => 'Cannot cancel this outbound'], 422);
         }
         $outbound->update(['status' => 'cancelled']);
-        return response()->json(['data' => $outbound]);
+        return response()->json(['data' => new OutboundResource($outbound->load(['warehouse', 'user']))]);
     }
 }

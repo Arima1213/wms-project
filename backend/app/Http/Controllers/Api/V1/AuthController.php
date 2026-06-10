@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Notifications\ResetPasswordNotification;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,7 @@ class AuthController extends Controller
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'data' => new UserResource($user),
             'token' => $token,
             'abilities' => $user->getPermissionNames(),
         ]);
@@ -55,12 +56,13 @@ class AuthController extends Controller
 
         $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json(['user' => $user, 'token' => $token], 201);
+        return response()->json(['data' => new UserResource($user), 'token' => $token], 201);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()]);
+        $user = $request->user()->load('roles:id,name');
+        return response()->json(['data' => new UserResource($user)]);
     }
 
     public function logout(Request $request): JsonResponse
@@ -78,7 +80,7 @@ class AuthController extends Controller
             'phone' => 'sometimes|string|max:20',
         ]);
         $user->update($validated);
-        return response()->json(['data' => $user->fresh()]);
+        return response()->json(['data' => new UserResource($user->fresh()->load('roles:id,name'))]);
     }
 
     public function updatePassword(Request $request): JsonResponse
@@ -104,11 +106,7 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $request->email)->first();
-
-        // Generate a reset token
         $token = Password::createToken($user);
-
-        // Send the notification
         $user->notify(new ResetPasswordNotification($token));
 
         return response()->json(['message' => 'Password reset link sent to your email']);

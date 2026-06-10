@@ -21,13 +21,21 @@ class InventoryFactory extends Factory
         return [
             'product_id' => $product->id,
             'warehouse_id' => $warehouse->id,
+            'rack_slot_id' => null,
+            'batch_number' => fake()->optional(0.3)->bothify('BATCH-####'),
+            'expiry_date' => fake()->optional(0.3)->dateTimeBetween('+1 month', '+2 years'),
             'quantity' => $qty,
             'available_quantity' => $qty,
             'reserved_quantity' => 0,
-            'minimum_stock' => fake()->randomFloat(2, 1, 10),
-            'maximum_stock' => fake()->randomFloat(2, 100, 2000),
-            'reorder_point' => fake()->randomFloat(2, 5, 50),
-            'location' => 'A-' . fake()->randomNumber(2) . '-' . fake()->randomNumber(3),
+            'unit_cost' => fake()->randomFloat(2, 1000, 500000),
         ];
+    }
+
+    public function withLowStock(): static
+    {
+        return $this->state(fn(array $attributes) => [
+            'quantity' => 2,
+            'available_quantity' => 2,
+        ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inbound;
 use App\Http\Requests\StoreInboundRequest;
 use App\Http\Requests\UpdateInboundRequest;
+use App\Http\Resources\InboundResource;
 use App\Services\DocumentSequenceService;
 use App\Services\InboundService;
 use Illuminate\Http\JsonResponse;
@@ -23,9 +24,9 @@ class InboundController extends Controller
         $this->documentSequence = $documentSequence;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = Inbound::with('warehouse', 'user');
+        $query = Inbound::with(['warehouse', 'user', 'items.product', 'supplier']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
@@ -35,13 +36,13 @@ class InboundController extends Controller
         }
 
         $inbounds = $query->orderByDesc('created_at')->paginate($request->get('per_page', 25));
-        return response()->json($inbounds);
+        return InboundResource::collection($inbounds);
     }
 
-    public function show(string|int $inbound): JsonResponse
+    public function show(string|int $inbound): InboundResource
     {
-        $inbound = Inbound::with(['warehouse', 'user', 'items.product'])->findOrFail($inbound);
-        return response()->json(['data' => $inbound]);
+        $inbound = Inbound::with(['warehouse', 'user', 'items.product', 'supplier'])->findOrFail($inbound);
+        return new InboundResource($inbound);
     }
 
     public function store(StoreInboundRequest $request): JsonResponse
@@ -83,7 +84,7 @@ class InboundController extends Controller
             }
 
             DB::commit();
-            return response()->json(['data' => $inbound->load('items')], 201);
+            return response()->json(['data' => new InboundResource($inbound->load('items.product', 'warehouse', 'user'))], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to create inbound', 'error' => $e->getMessage()], 500);
@@ -94,7 +95,7 @@ class InboundController extends Controller
     {
         $inbound = Inbound::findOrFail($inbound);
         $inbound->update($request->validated());
-        return response()->json(['data' => $inbound]);
+        return response()->json(['data' => new InboundResource($inbound->fresh(['warehouse', 'user']))]);
     }
 
     public function destroy(string|int $inbound): JsonResponse
@@ -122,7 +123,7 @@ class InboundController extends Controller
 
         try {
             $receivedInbound = $this->inboundService->receive($inbound, $request->user()->id, $items);
-            return response()->json(['data' => $receivedInbound]);
+            return response()->json(['data' => new InboundResource($receivedInbound->load(['warehouse', 'user', 'items.product', 'supplier']))]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -137,6 +138,6 @@ class InboundController extends Controller
             return response()->json(['message' => 'Cannot cancel this inbound'], 422);
         }
         $inbound->update(['status' => 'cancelled']);
-        return response()->json(['data' => $inbound]);
+        return response()->json(['data' => new InboundResource($inbound->load(['warehouse', 'user']))]);
     }
 }

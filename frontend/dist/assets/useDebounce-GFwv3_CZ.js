@@ -1,0 +1,1 @@
+import{D as s,r}from"./index-C97A81bg.js";function l(e="",c=300){const t=r(e),u=r(e);let o=null;return s(t,n=>{clearTimeout(o),o=setTimeout(()=>{u.value=n},c)}),{value:t,debouncedValue:u}}export{l as u};

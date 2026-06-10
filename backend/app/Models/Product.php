@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Inventory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -61,6 +62,11 @@ class Product extends Model
         return $this->hasMany(SlotStock::class);
     }
 
+    public function inventory(): HasMany
+    {
+        return $this->hasMany(Inventory::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -78,12 +84,8 @@ class Product extends Model
 
     public function scopeLowStock($query)
     {
-        // Products where total slot stock < min_stock
+        // Products where total available inventory < min_stock
         return $query->where('min_stock', '>', 0)
-            ->whereHas('slotStocks', function ($q) {
-                $q->where('is_current', true);
-            }, '<', function ($q) {
-                // This would need raw SQL; simplified for now
-            });
+            ->whereRaw('(SELECT COALESCE(SUM(available_quantity), 0) FROM inventory WHERE inventory.product_id = products.id) < products.min_stock');
     }
 }

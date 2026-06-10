@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PlanogramResource;
 use App\Models\{Planogram, PlanogramSnapshot, Warehouse};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,11 +29,11 @@ class PlanogramController extends Controller
                 'version' => '1.0',
                 'canvas_data' => ['zones' => [], 'items' => []],
             ]);
-            return response()->json(['data' => $planogram], 200);
+            return response()->json(['data' => new PlanogramResource($planogram)], 200);
         }
 
         $planogram->load('createdBy:id,name');
-        return response()->json(['data' => $planogram]);
+        return response()->json(['data' => new PlanogramResource($planogram)]);
     }
 
     public function update(Request $request, string|int $warehouse): JsonResponse
@@ -75,7 +76,7 @@ class PlanogramController extends Controller
             ]
         );
 
-        return response()->json(['data' => $planogram]);
+        return response()->json(['data' => new PlanogramResource($planogram)]);
     }
 
     public function snapshot(Request $request, string|int $warehouse): JsonResponse

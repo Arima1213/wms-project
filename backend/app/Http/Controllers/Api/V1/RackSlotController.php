@@ -3,31 +3,32 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RackSlotResource;
 use App\Models\RackSlot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RackSlotController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = RackSlot::with('rackLevel.rack.zone.warehouse');
+        $query = RackSlot::with('level.rack.zone.warehouse', 'fixedProduct');
 
         if ($request->has('rack_id')) {
-            $query->whereHas('rackLevel', fn($q) => $q->where('rack_id', $request->rack_id));
+            $query->whereHas('level', fn($q) => $q->where('rack_id', $request->rack_id));
         }
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
         $slots = $query->paginate($request->get('per_page', 50));
-        return response()->json($slots);
+        return RackSlotResource::collection($slots);
     }
 
-    public function show(string|int $slot): JsonResponse
+    public function show(string|int $slot): RackSlotResource
     {
-        $slot = RackSlot::with('rackLevel.rack.zone')->findOrFail($slot);
-        return response()->json(['data' => $slot]);
+        $slot = RackSlot::with('level.rack.zone', 'fixedProduct')->findOrFail($slot);
+        return new RackSlotResource($slot);
     }
 
     public function store(Request $request): JsonResponse
@@ -48,7 +49,7 @@ class RackSlotController extends Controller
             'max_weight_kg', 'max_height_cm', 'max_width_cm', 'max_depth_cm', 'slot_type',
         ]) + ['status' => 'empty', 'is_active' => true]);
 
-        return response()->json(['data' => $slot], 201);
+        return response()->json(['data' => new RackSlotResource($slot->load('level'))], 201);
     }
 
     public function update(Request $request, string|int $slot): JsonResponse
@@ -66,7 +67,7 @@ class RackSlotController extends Controller
             'slot_code', 'max_weight_kg', 'slot_type', 'is_active',
         ]));
 
-        return response()->json(['data' => $slot]);
+        return response()->json(['data' => new RackSlotResource($slot->load('level'))]);
     }
 
     public function destroy(string|int $slot): JsonResponse
@@ -89,7 +90,7 @@ class RackSlotController extends Controller
             'status' => 'partial',
         ]);
 
-        return response()->json(['data' => $slot]);
+        return response()->json(['data' => new RackSlotResource($slot->load('fixedProduct', 'level'))]);
     }
 
     public function unassignProduct(string|int $slot): JsonResponse
@@ -100,7 +101,7 @@ class RackSlotController extends Controller
             'status' => 'empty',
         ]);
 
-        return response()->json(['data' => $slot]);
+        return response()->json(['data' => new RackSlotResource($slot->load('level'))]);
     }
 
     public function reserve(Request $request, string|int $slot): JsonResponse
@@ -117,6 +118,6 @@ class RackSlotController extends Controller
             'reserved_until' => $request->reserved_until,
         ]);
 
-        return response()->json(['data' => $slot]);
+        return response()->json(['data' => new RackSlotResource($slot->load('level'))]);
     }
 }

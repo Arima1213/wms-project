@@ -165,6 +165,10 @@ export const reportAPI = {
   movement: (params) => api.get('/reports/mutations', { params }),
   valuation: (params) => api.get('/reports/valuation', { params }),
   warehouseUtilization: (params) => api.get('/reports/utilization', { params }),
+  aging: (params) => api.get('/reports/aging', { params }),
+  expiry: (params) => api.get('/reports/expiry', { params }),
+  activity: (params) => api.get('/reports/activity', { params }),
+  export: (data) => api.post('/reports/export', data, { responseType: 'blob' }),
 }
 
 // Users & RBAC

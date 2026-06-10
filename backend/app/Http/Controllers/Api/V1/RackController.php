@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RackResource;
 use App\Models\Rack;
 use App\Models\RackLevel;
+use App\Models\RackSlot;
 use App\Models\Zone;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,13 +16,14 @@ class RackController extends Controller
     /**
      * GET /v1/zones/{zone}/racks
      */
-    public function index(string|int $zone): JsonResponse
+    public function index(string|int $zone)
     {
         $racks = Rack::where('zone_id', $zone)
+            ->with('zone')
             ->withCount('levels', 'slots')
             ->orderBy('code')
             ->paginate(50);
-        return response()->json($racks);
+        return RackResource::collection($racks);
     }
 
     /**
@@ -61,19 +64,19 @@ class RackController extends Controller
 
         $rack->load('levels');
 
-        return response()->json(['data' => $rack], 201);
+        return response()->json(['data' => new RackResource($rack)], 201);
     }
 
     /**
      * GET /v1/zones/{zone}/racks/{rack}
      */
-    public function show(string|int $zone, string|int $rack): JsonResponse
+    public function show(string|int $zone, string|int $rack): RackResource
     {
         $rack = Rack::where('zone_id', $zone)
             ->where('id', $rack)
-            ->with('levels.slots')
+            ->with(['levels.slots', 'zone'])
             ->firstOrFail();
-        return response()->json(['data' => $rack]);
+        return new RackResource($rack);
     }
 
     /**
@@ -106,7 +109,7 @@ class RackController extends Controller
 
         $rack->update($updates);
 
-        return response()->json(['data' => $rack]);
+        return response()->json(['data' => new RackResource($rack->load('zone'))]);
     }
 
     /**
@@ -152,6 +155,6 @@ class RackController extends Controller
             'canvas_y' => $request->pos_y,
         ]);
 
-        return response()->json(['data' => $rack]);
+        return response()->json(['data' => new RackResource($rack->load('zone'))]);
     }
 }

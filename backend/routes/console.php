@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('wms:check-expiry')->daily();
 Schedule::command('wms:stock-alerts')->hourly();
+Schedule::command('webhooks:process-retries')->everyFiveMinutes();

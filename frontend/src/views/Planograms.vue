@@ -25,11 +25,6 @@
             class="input w-full"
           />
         </div>
-        <select v-model="filterStatus" class="input w-48">
-          <option value="">Semua Status</option>
-          <option value="active">Aktif</option>
-          <option value="draft">Draft</option>
-        </select>
       </div>
     </div>
 
@@ -72,11 +67,9 @@
           </span>
         </div>
 
-        <!-- Mini preview canvas -->
+        <!-- Mini preview - using canvas component -->
         <div class="bg-gray-50 rounded-lg mb-4 overflow-hidden" style="height: 120px;">
-          <div v-if="wh.planogram?.canvas_data" class="w-full h-full relative">
-            <canvas ref="miniCanvasRefs" :data-warehouse-id="wh.id" class="w-full h-full"></canvas>
-          </div>
+          <MiniPlanogram v-if="wh.planogram?.canvas_data" :canvas-data="wh.planogram.canvas_data" />
           <div v-else class="w-full h-full flex items-center justify-center">
             <MapIcon class="w-8 h-8 text-gray-300" />
           </div>
@@ -200,11 +193,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWarehouseStore } from '../stores/warehouse'
 import { planogramAPI } from '../services/api'
 import { useNotificationStore } from '../stores/notification'
+import MiniPlanogram from '../components/planogram/MiniPlanogram.vue'
 import {
   PlusIcon,
   MapIcon,
@@ -225,14 +219,12 @@ const warehouses = ref([])
 const loading = ref(true)
 const error = ref(null)
 const searchQuery = ref('')
-const filterStatus = ref('')
 const showCreateModal = ref(false)
 const showHistoryModal = ref(false)
 const historyWarehouse = ref(null)
 const history = ref([])
 const historyLoading = ref(false)
 const restoringId = ref(null)
-const miniCanvasRefs = ref([])
 
 const createForm = ref({
   warehouse_id: '',
@@ -254,7 +246,7 @@ async function fetchWarehouses() {
   try {
     await warehouseStore.fetchList({ per_page: 100 })
     const list = warehouseStore.warehouses
-    
+
     // Fetch planogram for each warehouse
     const withPlanograms = await Promise.all(
       list.map(async (wh) => {
@@ -340,44 +332,7 @@ function formatDate(dateStr) {
   }
 }
 
-function drawMiniPlanogram(wh) {
-  if (!wh.planogram?.canvas_data) return
-  const canvas = document.querySelector(`canvas[data-warehouse-id="${wh.id}"]`)
-  if (!canvas) return
-  const ctx = canvas.getContext('2d')
-  const data = wh.planogram.canvas_data
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#f9fafb'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  if (data.zones) {
-    data.zones.forEach(zone => {
-      ctx.fillStyle = zone.color || '#e0e7ff'
-      ctx.fillRect(zone.x || 0, zone.y || 0, zone.width || 60, zone.height || 40)
-      ctx.strokeStyle = '#c7d2fe'
-      ctx.strokeRect(zone.x || 0, zone.y || 0, zone.width || 60, zone.height || 40)
-    })
-  }
-  if (data.items) {
-    data.items.forEach(item => {
-      ctx.fillStyle = '#6366f1'
-      ctx.fillRect(item.x || 0, item.y || 0, (item.width || 20) - 2, (item.height || 20) - 2)
-    })
-  }
-}
-
 onMounted(async () => {
   await fetchWarehouses()
-  await nextTick()
-  warehouses.value.forEach(wh => {
-    if (wh.planogram) {
-      // Set canvas size
-      const canvas = document.querySelector(`canvas[data-warehouse-id="${wh.id}"]`)
-      if (canvas) {
-        canvas.width = canvas.offsetWidth
-        canvas.height = canvas.offsetHeight
-        drawMiniPlanogram(wh)
-      }
-    }
-  })
 })
 </script>

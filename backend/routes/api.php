@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\SettingController;
+use App\Http\Controllers\Api\V1\WebhookController;
 
 // Public routes
 Route::prefix('v1')->group(function () {
@@ -113,4 +114,12 @@ Route::post('/documents/upload', [DocumentController::class, 'upload']);
     Route::delete('/documents/{document}', [DocumentController::class, 'destroy']);
 
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
+
+    Route::middleware('permission:webhook.view')->group(function () {
+        Route::apiResource('webhooks', WebhookController::class);
+        Route::post('/webhooks/{webhook}/test', [WebhookController::class, 'test']);
+        Route::get('/webhooks/{webhook}/deliveries', [WebhookController::class, 'deliveries']);
+        Route::get('/webhooks/{webhook}/deliveries/{delivery}', [WebhookController::class, 'showDelivery']);
+        Route::post('/webhooks/{webhook}/deliveries/{delivery}/retry', [WebhookController::class, 'retryDelivery']);
+    });
 });

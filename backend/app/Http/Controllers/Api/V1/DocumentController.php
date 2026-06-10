@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,14 +11,14 @@ use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
         $query = Document::with('user:id,name')
             ->when($request->type, fn($q) => $q->where('type', $request->type))
             ->orderByDesc('created_at');
 
         $data = $query->paginate($request->get('per_page', 20));
-        return response()->json($data);
+        return DocumentResource::collection($data);
     }
 
     public function upload(Request $request): JsonResponse
@@ -41,14 +42,14 @@ class DocumentController extends Controller
             'disk' => 'minio',
         ]);
 
-        return response()->json(['data' => $doc], 201);
+        return response()->json(['data' => new DocumentResource($doc)], 201);
     }
 
     public function show(int $id): JsonResponse
     {
-        $doc = Document::findOrFail($id);
+        $doc = Document::with('user')->findOrFail($id);
         $url = Storage::disk('minio')->url($doc->path);
-        return response()->json(['data' => $doc, 'url' => $url]);
+        return response()->json(['data' => new DocumentResource($doc), 'url' => $url]);
     }
 
     public function destroy(int $id): JsonResponse

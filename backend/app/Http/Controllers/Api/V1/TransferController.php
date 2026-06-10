@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Transfer;
 use App\Http\Requests\StoreTransferRequest;
+use App\Http\Resources\TransferResource;
 use App\Services\DocumentSequenceService;
 use App\Services\TransferService;
 use Illuminate\Http\JsonResponse;
@@ -22,22 +23,22 @@ class TransferController extends Controller
         $this->documentSequence = $documentSequence;
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request)
     {
-        $query = Transfer::with('sourceWarehouse', 'destWarehouse', 'user');
+        $query = Transfer::with(['sourceWarehouse', 'destWarehouse', 'user', 'items.product']);
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
         $transfers = $query->orderByDesc('created_at')->paginate($request->get('per_page', 25));
-        return response()->json($transfers);
+        return TransferResource::collection($transfers);
     }
 
-    public function show(string|int $transfer): JsonResponse
+    public function show(string|int $transfer): TransferResource
     {
         $transfer = Transfer::with(['sourceWarehouse', 'destWarehouse', 'user', 'items.product'])->findOrFail($transfer);
-        return response()->json(['data' => $transfer]);
+        return new TransferResource($transfer);
     }
 
     public function store(StoreTransferRequest $request): JsonResponse
@@ -61,7 +62,7 @@ class TransferController extends Controller
             }
 
             DB::commit();
-            return response()->json(['data' => $transfer->load('items')], 201);
+            return response()->json(['data' => new TransferResource($transfer->load('items.product', 'sourceWarehouse', 'destWarehouse', 'user'))], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'Failed to create transfer', 'error' => $e->getMessage()], 500);
@@ -81,7 +82,7 @@ class TransferController extends Controller
             'approved_at' => now(),
             'approved_by' => $request->user()->id,
         ]);
-        return response()->json(['data' => $transfer]);
+        return response()->json(['data' => new TransferResource($transfer->load(['sourceWarehouse', 'destWarehouse', 'user']))]);
     }
 
     public function reject(Request $request, string|int $transfer): JsonResponse
@@ -93,7 +94,7 @@ class TransferController extends Controller
             return response()->json(['message' => 'Cannot reject this transfer'], 422);
         }
         $transfer->update(['status' => 'rejected']);
-        return response()->json(['data' => $transfer]);
+        return response()->json(['data' => new TransferResource($transfer->load(['sourceWarehouse', 'destWarehouse', 'user']))]);
     }
 
     public function execute(Request $request, string|int $transferId): JsonResponse
@@ -103,7 +104,7 @@ class TransferController extends Controller
         
         try {
             $executedTransfer = $this->transferService->execute($transfer, $request->user()->id);
-            return response()->json(['data' => $executedTransfer]);
+            return response()->json(['data' => new TransferResource($executedTransfer->load(['sourceWarehouse', 'destWarehouse', 'user', 'items.product']))]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
