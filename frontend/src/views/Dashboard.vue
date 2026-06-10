@@ -147,7 +147,19 @@ const stats = computed(() => {
 })
 
 const stockSummary = computed(() => {
-  // Mock data or mapped from API
+  if (store.metrics) {
+    const m = store.metrics
+    const totalActive = m.total_products || 1
+    const lowStockPct = Math.min(Math.round(((m.low_stock || 0) / totalActive) * 100), 100)
+    const nearExpiryPct = Math.min(Math.round(((m.near_expiry || 0) / totalActive) * 100), 100)
+    const availablePct = Math.max(0, 100 - lowStockPct - nearExpiryPct - 5)
+    return [
+      { name: 'Tersedia (Available)', value: availablePct, color: 'bg-emerald-500' },
+      { name: 'Hampir Kadaluarsa', value: nearExpiryPct, color: 'bg-amber-500' },
+      { name: 'Stok Menipis', value: lowStockPct, color: 'bg-rose-500' },
+      { name: 'Tidak Aktif', value: 5, color: 'bg-gray-300' },
+    ]
+  }
   return [
     { name: 'Tersedia (Available)', value: 72, color: 'bg-emerald-500' },
     { name: 'Dipesan (Reserved)', value: 18, color: 'bg-blue-500' },
@@ -174,10 +186,10 @@ const warehouseUtil = computed(() => {
 const recentActivities = computed(() => {
   if (store.recentActivity && store.recentActivity.length) {
     return store.recentActivity.map((a, i) => ({
-      id: i,
+      id: a.id || i,
       title: a.title,
-      desc: a.description,
-      time: a.time_ago,
+      desc: a.desc || a.description,
+      time: a.time || a.time_ago,
       icon: a.type === 'inbound' ? ArrowUpCircleIcon : a.type === 'outbound' ? ArrowDownCircleIcon : CubeIcon,
       iconColor: a.type === 'inbound' ? 'bg-emerald-100 text-emerald-600' : a.type === 'outbound' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
     }))
