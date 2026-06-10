@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Outbound;
+use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 
 class OutboundService
@@ -47,10 +48,11 @@ class OutboundService
                     $item->ordered_qty,
                     $userId,
                     [
-                        'reference_type' => 'App\Models\Outbound',
+                        'reference_type' => 'App\\Models\\Outbound',
                         'reference_id' => $outbound->id,
                         'reference_number' => $outbound->outbound_number,
                         'notes' => 'Shipped for outbound ' . $outbound->outbound_number,
+                        'uom_id' => $item->product?->unit_id,
                     ]
                 );
             }

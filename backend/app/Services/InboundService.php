@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Inbound;
 use App\Models\InboundItem;
+use App\Models\Product;
 use Illuminate\Support\Facades\DB;
 
 class InboundService
@@ -54,6 +55,7 @@ class InboundService
                             'reference_id' => $inbound->id,
                             'reference_number' => $inbound->inbound_number,
                             'notes' => 'Received from inbound ' . $inbound->inbound_number,
+                            'uom_id' => $item->product?->unit_id,
                         ]
                     );
                 }
@@ -96,6 +98,7 @@ class InboundService
                                 'reference_id' => $inbound->id,
                                 'reference_number' => $inbound->inbound_number,
                                 'notes' => 'Received from inbound ' . $inbound->inbound_number,
+                                'uom_id' => $item->product?->unit_id,
                             ]
                         );
                     }

@@ -48,10 +48,11 @@ class StockOpnameService
                         $item->variance,
                         $userId,
                         [
-                            'reference_type' => 'App\Models\StockOpname',
+                            'reference_type' => 'App\\Models\\StockOpname',
                             'reference_id' => $opname->id,
                             'reference_number' => $opname->opname_number,
                             'notes' => 'Stock opname adjustment ' . $opname->opname_number,
+                            'uom_id' => $item->product?->unit_id,
                         ]
                     );
                 }

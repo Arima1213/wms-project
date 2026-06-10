@@ -5,11 +5,18 @@ namespace App\Services;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
 use App\Models\StockTransaction;
+use App\Services\UomConversionService;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Collection;
 
 class InventoryService
 {
+    protected UomConversionService $uomConversion;
+
+    public function __construct(?UomConversionService $uomConversion = null)
+    {
+        $this->uomConversion = $uomConversion ?? app(UomConversionService::class);
+    }
     public function list(array $filters): Collection
     {
         $query = Inventory::query();
@@ -40,7 +47,7 @@ class InventoryService
      * @param int $warehouseId
      * @param float $quantity
      * @param int $userId
-     * @param array $options [batch_number, expiry_date, reference_type, reference_id, reference_number, notes]
+     * @param array $options [batch_number, expiry_date, reference_type, reference_id, reference_number, notes, uom_id]
      * @return Inventory
      */
     public function receiveStock(int $productId, int $warehouseId, float $quantity, int $userId, array $options = []): Inventory
@@ -62,6 +69,18 @@ class InventoryService
         }
         $inventory->save();
 
+        // Calculate quantity in base UOM
+        $uomId = $options['uom_id'] ?? null;
+        $quantityInBaseUom = $quantity;
+        if ($uomId !== null) {
+            try {
+                $quantityInBaseUom = $this->uomConversion->getBaseQuantity($quantity, $uomId, $productId);
+            } catch (\Exception $e) {
+                // If conversion fails, fall through to raw quantity
+                $quantityInBaseUom = $quantity;
+            }
+        }
+
         StockTransaction::create([
             'ulid' => (string) Str::ulid(),
             'transaction_type' => 'GR',
@@ -70,9 +89,10 @@ class InventoryService
             'product_id' => $productId,
             'warehouse_id' => $warehouseId,
             'dest_warehouse_id' => $warehouseId,
-            'batch_id' => null, // Should match with ProductBatch logic if needed
+            'batch_id' => null,
             'quantity' => $quantity,
-            'quantity_in_base_uom' => $quantity,
+            'uom_id' => $uomId,
+            'quantity_in_base_uom' => $quantityInBaseUom,
             'stock_before' => $stockBefore,
             'stock_after' => $inventory->quantity,
             'reference_number' => $options['reference_number'] ?? null,
@@ -95,7 +115,7 @@ class InventoryService
      * @param int $warehouseId
      * @param float $quantity
      * @param int $userId
-     * @param array $options [strategy, reference_type, reference_id, reference_number, notes]
+     * @param array $options [strategy, reference_type, reference_id, reference_number, notes, uom_id]
      *                       strategy: 'fifo' (default) or 'fefo'
      * @return array<int, StockTransaction> Array of movement records (one per inventory batch)
      * @throws InsufficientStockException
@@ -103,6 +123,17 @@ class InventoryService
     public function issueStock(int $productId, int $warehouseId, float $quantity, int $userId, array $options = []): array
     {
         $strategy = $options['strategy'] ?? 'fifo';
+        $uomId = $options['uom_id'] ?? null;
+
+        // Calculate quantity in base UOM for transaction recording
+        $quantityInBaseUom = $quantity;
+        if ($uomId !== null) {
+            try {
+                $quantityInBaseUom = $this->uomConversion->getBaseQuantity($quantity, $uomId, $productId);
+            } catch (\Exception $e) {
+                $quantityInBaseUom = $quantity;
+            }
+        }
 
         // Ambil semua inventory records yang masih punya stok
         $query = Inventory::where('product_id', $productId)
@@ -159,7 +190,8 @@ class InventoryService
                 'source_warehouse_id' => $warehouseId,
                 'batch_id' => null,
                 'quantity' => $taken,
-                'quantity_in_base_uom' => $taken,
+                'uom_id' => $uomId,
+                'quantity_in_base_uom' => $quantityInBaseUom,
                 'stock_before' => $stockBefore,
                 'stock_after' => $inventory->quantity,
                 'reference_number' => $options['reference_number'] ?? null,
@@ -182,12 +214,23 @@ class InventoryService
      * @param int $destWarehouseId
      * @param float $quantity
      * @param int $userId
-     * @param array $options
+     * @param array $options [reference_type, reference_id, reference_number, notes, uom_id]
      * @return void
      * @throws \Exception
      */
     public function transferStock(int $productId, int $sourceWarehouseId, int $destWarehouseId, float $quantity, int $userId, array $options = []): void
     {
+        $uomId = $options['uom_id'] ?? null;
+
+        // Calculate quantity in base UOM
+        $quantityInBaseUom = $quantity;
+        if ($uomId !== null) {
+            try {
+                $quantityInBaseUom = $this->uomConversion->getBaseQuantity($quantity, $uomId, $productId);
+            } catch (\Exception $e) {
+                $quantityInBaseUom = $quantity;
+            }
+        }
         // Create a single TR record instead of GI + GR.
 
         // 2. We should ideally update the GI transaction type to TR, but for simplicity, 
@@ -227,7 +270,8 @@ class InventoryService
             'source_warehouse_id' => $sourceWarehouseId,
             'dest_warehouse_id' => $destWarehouseId,
             'quantity' => $quantity,
-            'quantity_in_base_uom' => $quantity,
+            'uom_id' => $uomId,
+            'quantity_in_base_uom' => $quantityInBaseUom,
             'stock_before' => $sourceBefore,
             'stock_after' => $sourceInventory->quantity,
             'reference_number' => $options['reference_number'] ?? null,
@@ -244,12 +288,24 @@ class InventoryService
      * @param int $warehouseId
      * @param float $differenceQty (positive or negative)
      * @param int $userId
-     * @param array $options
+     * @param array $options [reference_type, reference_id, reference_number, notes, uom_id]
      * @return void
      */
     public function adjustStock(int $productId, int $warehouseId, float $differenceQty, int $userId, array $options = []): void
     {
         if ($differenceQty == 0) return;
+
+        $uomId = $options['uom_id'] ?? null;
+
+        // Calculate quantity in base UOM
+        $quantityInBaseUom = abs($differenceQty);
+        if ($uomId !== null) {
+            try {
+                $quantityInBaseUom = $this->uomConversion->getBaseQuantity(abs($differenceQty), $uomId, $productId);
+            } catch (\Exception $e) {
+                $quantityInBaseUom = abs($differenceQty);
+            }
+        }
 
         $inventory = Inventory::firstOrNew([
             'product_id' => $productId,
@@ -285,7 +341,8 @@ class InventoryService
             'product_id' => $productId,
             'warehouse_id' => $warehouseId,
             'quantity' => abs($differenceQty),
-            'quantity_in_base_uom' => abs($differenceQty),
+            'uom_id' => $uomId,
+            'quantity_in_base_uom' => $quantityInBaseUom,
             'stock_before' => $stockBefore,
             'stock_after' => $inventory->quantity,
             'reference_number' => $options['reference_number'] ?? null,
