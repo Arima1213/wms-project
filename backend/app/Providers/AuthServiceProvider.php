@@ -16,6 +16,7 @@ use App\Models\Planogram;
 use App\Models\Document;
 use App\Models\Inventory;
 use App\Models\User;
+use App\Models\Notification;
 use App\Policies\InboundPolicy;
 use App\Policies\OutboundPolicy;
 use App\Policies\WarehousePolicy;
@@ -41,6 +42,7 @@ class AuthServiceProvider extends ServiceProvider
         Document::class => DocumentPolicy::class,
         Inventory::class => InventoryPolicy::class,
         User::class => UserPolicy::class,
+        Notification::class => \App\Policies\NotificationPolicy::class,
     ];
 
     public function boot(): void

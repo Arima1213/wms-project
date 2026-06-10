@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
         $this->call(PlanogramSeeder::class);
         $this->call(DocumentSequenceSeeder::class);
         $this->call(WebhookSeeder::class);
+        $this->call(AlertRuleSeeder::class);
         $this->call(AuditLogSeeder::class);
 
         $this->command->info('');

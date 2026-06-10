@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\AuditLogController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\WebhookController;
+use App\Http\Controllers\Api\V1\NotificationController;
 
 // Public routes
 Route::prefix('v1')->group(function () {
@@ -122,4 +123,10 @@ Route::post('/documents/upload', [DocumentController::class, 'upload']);
         Route::get('/webhooks/{webhook}/deliveries/{delivery}', [WebhookController::class, 'showDelivery']);
         Route::post('/webhooks/{webhook}/deliveries/{delivery}/retry', [WebhookController::class, 'retryDelivery']);
     });
+
+    // Notification & Alert Routes
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 });
