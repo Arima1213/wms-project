@@ -403,8 +403,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { warehouseAPI, planogramAPI } from '../services/api'
+import { useNotificationStore } from '../stores/notification'
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
@@ -423,6 +424,7 @@ import { id } from 'date-fns/locale'
 
 const route = useRoute()
 const router = useRouter()
+const notify = useNotificationStore()
 
 const warehouseId = computed(() => route.params.warehouseId)
 const warehouse = ref(null)
@@ -565,6 +567,9 @@ async function loadPlanogram() {
     }
   } catch (e) {
     // No planogram yet — start empty
+    if (e?.response?.status !== 404) {
+      notify.warning('Gagal memuat planogram: ' + (e.message || 'Terjadi kesalahan'))
+    }
     zones.value = []
     planogramItems.value = []
   }
@@ -599,8 +604,9 @@ async function savePlanogram() {
     currentPlanogram.value = res.data
     lastSaved.value = new Date()
     hasChanges.value = false
+    notify.success('Planogram berhasil disimpan')
   } catch (e) {
-    alert('Gagal menyimpan: ' + e.message)
+    notify.error('Gagal menyimpan: ' + (e.message || 'Terjadi kesalahan'))
   } finally {
     saving.value = false
   }
@@ -611,9 +617,9 @@ async function takeSnapshot() {
     await planogramAPI.snapshot(warehouseId.value, {
       change_summary: 'Snapshot manual'
     })
-    alert('Snapshot berhasil disimpan')
+    notify.success('Snapshot berhasil disimpan')
   } catch (e) {
-    alert('Gagal snapshot: ' + e.message)
+    notify.error('Gagal snapshot: ' + (e.message || 'Terjadi kesalahan'))
   }
 }
 
@@ -860,6 +866,17 @@ function handleKeydown(e) {
 function formatTime(date) {
   return format(date, 'HH:mm:ss', { locale: id })
 }
+
+onBeforeRouteLeave((to, from, next) => {
+  if (hasChanges.value) {
+    const answer = window.confirm('Anda memiliki perubahan yang belum disimpan. Simpan sebelum meninggalkan halaman?')
+    if (!answer) {
+      next(false)
+      return
+    }
+  }
+  next()
+})
 
 // Handle dragover on canvas for product drop
 onMounted(async () => {

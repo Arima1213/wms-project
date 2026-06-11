@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Scout\Searchable;
 
 class Outbound extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'outbound_number', 'warehouse_id', 'customer_id', 'type', 'status',
@@ -30,4 +31,18 @@ class Outbound extends Model
     public function warehouse(): BelongsTo { return $this->belongsTo(Warehouse::class); }
     public function user(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function items(): HasMany { return $this->hasMany(OutboundItem::class); }
+
+    public function toSearchableArray()
+    {
+        return [
+            'id' => $this->id,
+            'outbound_number' => $this->outbound_number,
+            'status' => $this->status,
+            'type' => $this->type,
+            'reference_number' => $this->reference_number,
+            'destination_name' => $this->destination_name,
+            'tracking_number' => $this->tracking_number,
+            'notes' => $this->notes,
+        ];
+    }
 }

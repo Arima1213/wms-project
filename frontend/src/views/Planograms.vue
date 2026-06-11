@@ -193,8 +193,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useWarehouseStore } from '../stores/warehouse'
 import { planogramAPI } from '../services/api'
 import { useNotificationStore } from '../stores/notification'
@@ -225,6 +225,30 @@ const historyWarehouse = ref(null)
 const history = ref([])
 const historyLoading = ref(false)
 const restoringId = ref(null)
+
+const hasUnsavedChanges = ref(false)
+
+// Track changes to create form
+watch(createForm.value, () => {
+  if (showCreateModal.value) {
+    hasUnsavedChanges.value = true
+  }
+}, { deep: true })
+
+watch(showCreateModal, (val) => {
+  if (!val) hasUnsavedChanges.value = false
+})
+
+onBeforeRouteLeave((to, from, next) => {
+  if (hasUnsavedChanges.value) {
+    const answer = window.confirm('Anda memiliki perubahan yang belum disimpan. Apakah Anda yakin ingin meninggalkan halaman ini?')
+    if (!answer) {
+      next(false)
+      return
+    }
+  }
+  next()
+})
 
 const createForm = ref({
   warehouse_id: '',
@@ -297,7 +321,7 @@ async function restoreSnapshot(snap) {
     await fetchWarehouses()
     showHistoryModal.value = false
   } catch (e) {
-    alert('Gagal memulihkan: ' + e.message)
+    notify.error('Gagal memulihkan: ' + (e.message || 'Terjadi kesalahan'))
   } finally {
     restoringId.value = null
   }
@@ -314,12 +338,13 @@ async function createPlanogram() {
     })
     showCreateModal.value = false
     createForm.value = { warehouse_id: '', change_summary: '' }
+    hasUnsavedChanges.value = false
     await fetchWarehouses()
     // Open editor
     const wh = warehouses.value.find(w => w.id === whId)
     if (wh) openPlanogram(wh)
   } catch (e) {
-    alert('Gagal membuat planogram: ' + e.message)
+    notify.error('Gagal membuat planogram: ' + (e.message || 'Terjadi kesalahan'))
   }
 }
 

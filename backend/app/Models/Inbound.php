@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 
 class Inbound extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, Searchable;
 
     protected $fillable = [
         'inbound_number', 'warehouse_id', 'supplier_id',
@@ -53,5 +54,17 @@ class Inbound extends Model
     public function scopeByStatus($query, string $status)
     {
         return $query->where('status', $status);
+    }
+
+    public function toSearchableArray()
+    {
+        return [
+            'id' => $this->id,
+            'inbound_number' => $this->inbound_number,
+            'status' => $this->status,
+            'source_type' => $this->source_type,
+            'source_reference' => $this->source_reference,
+            'notes' => $this->notes,
+        ];
     }
 }

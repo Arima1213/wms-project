@@ -74,12 +74,14 @@ export const usePlanogramStore = defineStore('planogram', () => {
       history.value = []
       historyIndex.value = -1
       pushHistory()
-    } catch {
+    } catch (e) {
       zones.value = []
       items.value = []
       history.value = []
       historyIndex.value = -1
       pushHistory()
+      notify.error('Gagal memuat planogram')
+      console.error('Planogram load error:', e)
     } finally {
       loading.value = false
     }

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useNotificationStore } from '../stores/notification'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -8,21 +9,6 @@ const api = axios.create({
   },
   withCredentials: true,
 })
-
-// Notification helper
-let notify = null
-const getNotify = () => {
-  if (!notify) {
-    // Dynamic import to avoid circular dependencies and pinia init issues
-    import('../stores/notification').then((module) => {
-      notify = module.useNotificationStore()
-    })
-  }
-  return notify
-}
-
-// Pre-initialize
-getNotify()
 
 // ============================
 // CSRF Refresh
@@ -53,9 +39,8 @@ api.interceptors.response.use(
     const method = response.config.method?.toLowerCase()
     // Auto-success for mutations
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
-      if (!response.config.url.includes('/snapshot') && !response.config.url.includes('/login')) {
-        const store = getNotify()
-        if (store) store.success(response.data?.message || 'Proses berhasil diselesaikan')
+      if (!response.config._silentNotification && !response.config.url.includes('/snapshot') && !response.config.url.includes('/login')) {
+        useNotificationStore().success(response.data?.message || 'Proses berhasil diselesaikan')
       }
     }
     return response.data
@@ -66,26 +51,26 @@ api.interceptors.response.use(
 
     if (status === 401 && !url.includes('/login') && !isRedirectingToLogin) {
       isRedirectingToLogin = true
-      const store = getNotify()
-      if (store) {
-        store.error('Sesi kamu telah habis. Mengarahkan ke halaman login...')
-      }
+      useNotificationStore().error('Sesi kamu telah habis. Mengarahkan ke halaman login...')
       setTimeout(() => {
         window.location.href = '/login'
       }, 1500)
     } else if (status === 419) {
-      // CSRF token mismatch — refresh CSRF cookie silently and retry
+      // CSRF token mismatch — refresh CSRF cookie silently and retry (max 3x)
+      const config = error.config
+      config._csrfRetryCount = (config._csrfRetryCount || 0) + 1
+      if (config._csrfRetryCount > 3) {
+        useNotificationStore().error('CSRF token refresh gagal setelah beberapa kali percobaan')
+        return Promise.reject(error)
+      }
       return csrfAPI.get('/sanctum/csrf-cookie').then(() => {
-        const config = error.config
         config.headers['X-XSRF-TOKEN'] = ''
         return api(config)
       })
     } else if (status !== 401) {
-      const store = getNotify()
-      if (store) {
-        const msg = error.response?.data?.message || 'Terjadi kesalahan sistem, silakan coba lagi'
-        store.error(msg)
-      }
+      useNotificationStore().error(
+        error.response?.data?.message || 'Terjadi kesalahan sistem, silakan coba lagi'
+      )
     }
     return Promise.reject(error)
   }
