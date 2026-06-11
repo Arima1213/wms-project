@@ -127,6 +127,7 @@ Route::post('/documents/upload', [DocumentController::class, 'upload']);
 
     // Return Routes
     Route::apiResource('returns', ReturnController::class);
+    Route::post('/returns/{return}/submit', [ReturnController::class, 'submit']);
     Route::post('/returns/{return}/approve', [ReturnController::class, 'approve']);
     Route::post('/returns/{return}/process', [ReturnController::class, 'process']);
     Route::post('/returns/{return}/reject', [ReturnController::class, 'reject']);

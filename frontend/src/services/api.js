@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:8080/api') + '/v1',
+  baseURL: '/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -24,13 +24,35 @@ const getNotify = () => {
 // Pre-initialize
 getNotify()
 
+// ============================
+// CSRF Refresh
+// ============================
+// Track agar tidak refresh CSRF berkali-kali dalam waktu singkat
+let lastCsrfRefresh = 0
+const CSRF_REFRESH_INTERVAL = 30 * 60 * 1000 // 30 menit
+
+// Request interceptor — refresh CSRF cookie sebelum mutation
+api.interceptors.request.use(async (config) => {
+  if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+    const now = Date.now()
+    if (now - lastCsrfRefresh > CSRF_REFRESH_INTERVAL) {
+      try {
+        await csrfAPI.get('/sanctum/csrf-cookie')
+        lastCsrfRefresh = now
+      } catch {}
+    }
+  }
+  return config
+}, (error) => Promise.reject(error))
+
 // Response interceptor
+let isRedirectingToLogin = false
+
 api.interceptors.response.use(
   (response) => {
     const method = response.config.method?.toLowerCase()
     // Auto-success for mutations
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
-      // Exclude some endpoints if they are too noisy, like planogram auto-save
       if (!response.config.url.includes('/snapshot') && !response.config.url.includes('/login')) {
         const store = getNotify()
         if (store) store.success(response.data?.message || 'Proses berhasil diselesaikan')
@@ -39,9 +61,26 @@ api.interceptors.response.use(
     return response.data
   },
   (error) => {
-    if (error.response?.status === 401) {
-      window.location.href = '/login'
-    } else {
+    const status = error.response?.status
+    const url = window.location.pathname
+
+    if (status === 401 && !url.includes('/login') && !isRedirectingToLogin) {
+      isRedirectingToLogin = true
+      const store = getNotify()
+      if (store) {
+        store.error('Sesi kamu telah habis. Mengarahkan ke halaman login...')
+      }
+      setTimeout(() => {
+        window.location.href = '/login'
+      }, 1500)
+    } else if (status === 419) {
+      // CSRF token mismatch — refresh CSRF cookie silently and retry
+      return csrfAPI.get('/sanctum/csrf-cookie').then(() => {
+        const config = error.config
+        config.headers['X-XSRF-TOKEN'] = ''
+        return api(config)
+      })
+    } else if (status !== 401) {
       const store = getNotify()
       if (store) {
         const msg = error.response?.data?.message || 'Terjadi kesalahan sistem, silakan coba lagi'
@@ -53,6 +92,15 @@ api.interceptors.response.use(
 )
 
 export default api
+
+// CSRF-specific axios — uses Vite proxy so it's same-origin (no CORS issues)
+// Vite config proxies /sanctum/* to the backend server
+export const csrfAPI = axios.create({
+  baseURL: '',
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+})
 
 // Auth
 export const authAPI = {

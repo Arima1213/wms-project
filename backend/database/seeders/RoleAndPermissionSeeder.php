@@ -35,38 +35,35 @@ class RoleAndPermissionSeeder extends Seeder
 
         foreach ($modules as $module => $actions) {
             foreach ($actions as $action) {
-                Permission::create([
+                Permission::firstOrCreate([
                     'name' => "{$module}.{$action}",
                     'guard_name' => 'sanctum',
+                ], [
                     'group' => $module,
                 ]);
             }
         }
 
         // Super Admin — all permissions
-        $superAdmin = Role::create([
-            'name' => 'super_admin',
-            'guard_name' => 'sanctum',
-            'description' => 'Full system access',
-            'is_system' => true,
-        ]);
+        $superAdmin = Role::firstOrCreate(
+            ['name' => 'super_admin', 'guard_name' => 'sanctum'],
+            ['description' => 'Full system access', 'is_system' => true]
+        );
         $superAdmin->givePermissionTo(Permission::all());
 
         // Manager — most permissions except user/role/webhook management
-        $managerRole = Role::create([
-            'name' => 'manager',
-            'guard_name' => 'sanctum',
-            'description' => 'Warehouse manager — operational + reports',
-        ]);
+        $managerRole = Role::firstOrCreate(
+            ['name' => 'manager', 'guard_name' => 'sanctum'],
+            ['description' => 'Warehouse manager — operational + reports']
+        );
         $managerPerms = Permission::whereNotIn('group', ['user', 'role', 'webhook', 'setting'])->get();
         $managerRole->givePermissionTo($managerPerms);
 
         // Operator — operational permissions only (view + basic ops)
-        $operatorRole = Role::create([
-            'name' => 'operator',
-            'guard_name' => 'sanctum',
-            'description' => 'Warehouse operator — daily operations',
-        ]);
+        $operatorRole = Role::firstOrCreate(
+            ['name' => 'operator', 'guard_name' => 'sanctum'],
+            ['description' => 'Warehouse operator — daily operations']
+        );
         $operatorRole->givePermissionTo(
             Permission::where('name', 'like', '%.view')->get()
         );
@@ -80,11 +77,10 @@ class RoleAndPermissionSeeder extends Seeder
         );
 
         // Viewer — read-only
-        $viewerRole = Role::create([
-            'name' => 'viewer',
-            'guard_name' => 'sanctum',
-            'description' => 'Read-only access',
-        ]);
+        $viewerRole = Role::firstOrCreate(
+            ['name' => 'viewer', 'guard_name' => 'sanctum'],
+            ['description' => 'Read-only access']
+        );
         $viewerRole->givePermissionTo(Permission::where('name', 'like', '%.view')->get());
 
         $this->command->info('Roles & Permissions seeded successfully.');

@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import api from '../services/api'
+import api, { csrfAPI } from '../services/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const token = ref(null)
   const loading = ref(false)
+  // Track apakah session sudah dicek dari cookie (untuk app init)
+  const initialized = ref(false)
 
   const isLoggedIn = computed(() => !!token.value)
   const userInitials = computed(() => {
@@ -28,10 +30,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       // 1. Get CSRF cookie first (Sanctum SPA requirement)
-      await api.get('/sanctum/csrf-cookie')
+      await csrfAPI.get('/sanctum/csrf-cookie')
       // 2. Login — server sets httpOnly session cookie
       const res = await api.post('/login', credentials)
-      user.value = res.data?.user || res.user
+      user.value = res.data || res.user
       token.value = 'authenticated' // dummy value — real auth is in httpOnly cookie
       return { success: true }
     } catch (error) {
@@ -53,13 +55,37 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.get('/me')
       user.value = res.data || res
-    } catch {}
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Init — dipanggil sekali pas app start.
+   * Coba restore session dari cookie (tanpa ini, refresh halaman = redirect login)
+   */
+  async function init() {
+    if (initialized.value) return
+    loading.value = true
+    try {
+      // Refresh CSRF cookie dulu biar aman
+      await csrfAPI.get('/sanctum/csrf-cookie')
+      // Coba fetch profile — kalau cookie valid, session masih aktif
+      const ok = await fetchProfile()
+      if (ok) token.value = 'authenticated'
+    } catch {
+      // Session expired / gak ada — biarin token null
+    } finally {
+      initialized.value = true
+      loading.value = false
+    }
   }
 
   return {
-    user, token, loading,
+    user, token, loading, initialized,
     isLoggedIn, userInitials, permissions,
     hasPermission, hasRole,
-    login, logout, fetchProfile,
+    login, logout, fetchProfile, init,
   }
 })

@@ -11,6 +11,7 @@ class ReturnItemResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'uuid' => $this->uuid,
             'return_id' => $this->return_id,
             'product_id' => $this->product_id,
             'quantity' => $this->quantity,

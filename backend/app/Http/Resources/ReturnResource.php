@@ -17,12 +17,10 @@ class ReturnResource extends JsonResource
             'type' => $this->type,
             'reason' => $this->reason,
             'status' => $this->status,
+            'notes' => $this->notes,
             'refund_amount' => $this->refund_amount,
             'return_date' => $this->return_date,
             'processed_date' => $this->processed_date,
-            'reference_type' => $this->reference_type,
-            'reference_id' => $this->reference_id,
-            'notes' => $this->notes,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'warehouse' => $this->whenLoaded('warehouse', fn() => [
@@ -41,10 +39,6 @@ class ReturnResource extends JsonResource
             'creator' => $this->whenLoaded('creator', fn() => [
                 'id' => $this->creator->id,
                 'name' => $this->creator->name,
-            ]),
-            'processor' => $this->whenLoaded('processor', fn() => [
-                'id' => $this->processor->id,
-                'name' => $this->processor->name,
             ]),
             'items' => ReturnItemResource::collection($this->whenLoaded('items')),
         ];

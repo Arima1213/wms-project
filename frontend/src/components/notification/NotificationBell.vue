@@ -72,7 +72,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNotificationDataStore } from '../stores/notificationData'
+import { useNotificationDataStore } from '../../stores/notificationData'
 import {
   BellIcon,
   BellSlashIcon,

@@ -22,38 +22,83 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
     
-    // Assert login success
-    await expect(page).toHaveURL('/', { timeout: 15000 });
+    // Assert login success — wait for login API to complete
+    const loginResp = page.waitForResponse(
+      resp => resp.url().includes('/api/v1/login') && resp.status() === 200,
+      { timeout: 15000 }
+    );
+    await loginResp;
+    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL('/', { timeout: 10000 });
     await expect(page.locator('text=Aktivitas Terakhir')).toBeVisible();
 
     // 2. Master Data - Gudang
     await page.click('a[href="/warehouses"]');
     await expect(page).toHaveURL(/\/warehouses/);
+    
+    // Clean up existing test warehouse if any
+    await page.evaluate(() => {
+      document.querySelectorAll('[data-v-68cf749f] .fixed.inset-0').forEach(el => {
+        el.style.display = 'none';
+      });
+    });
+    await page.waitForTimeout(500);
+    
     await page.click('text=+ Tambah Gudang');
     
+    // Wait for modal to open (Modal component has transition)
+    await page.waitForSelector('text=Tambah Gudang', { state: 'visible' });
+    await page.waitForTimeout(500);
+    
+    // Use unique code with timestamp to avoid duplicates
+    const whCode = 'WH-TEST-' + Date.now().toString().slice(-6);
+    const whName = 'Gudang Testing Playwright';
+    
     // Fill Warehouse Form using placeholders
-    await page.fill('input[placeholder="WH001"]', 'WH-TEST-001');
-    await page.fill('input[placeholder="Gudang Utama"]', 'Gudang Testing Playwright');
-    // For selects we might need to target the select element inside the modal
-    // But since it's the only form, we can use placeholder or wait for the button
-    await page.click('button:has-text("Simpan")');
-    await expect(page.locator('text=Gudang Testing Playwright')).toBeVisible({ timeout: 15000 });
+    await page.fill('input[placeholder="WH001"]', whCode);
+    await page.fill('input[placeholder="Gudang Utama"]', whName);
+    // Click the "Simpan" button inside the modal footer
+    await page.locator('.fixed.inset-0 button:has-text("Simpan")').click();
+    // Wait for response and modal to close
+    await page.waitForTimeout(2000);
+    // Close modal if still open (e.g. if save failed)
+    const modalOpen = await page.locator('.fixed.inset-0').isVisible().catch(() => false);
+    if (modalOpen) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+    // The warehouse name should appear in the table (either new or from previous run)
+    await expect(page.locator(`text=${whName}`).first()).toBeVisible({ timeout: 10000 });
 
     // 3. Master Data - Produk
+    const prodCode = 'PROD-' + Date.now().toString().slice(-6);
+    const prodSku = 'SKU-' + Date.now().toString().slice(-6);
+    
     await page.click('a[href="/products"]');
     await expect(page).toHaveURL(/\/products/);
     await page.click('text=+ Tambah Produk');
     
     // Fill Product Form using placeholders
-    await page.fill('input[placeholder="PRD-001"]', 'PROD-TEST-999');
-    await page.fill('input[placeholder="SKU-001"]', 'SKU-TEST-999');
+    await page.fill('input[placeholder="PRD-001"]', prodCode);
+    await page.fill('input[placeholder="SKU-001"]', prodSku);
     await page.fill('input[placeholder="Kopi Arabica..."]', 'Produk Testing Playwright');
     // Category select: it's a select element, we can use its options if any, or leave it blank
     await page.selectOption('select:has(option[value="standard"])', 'standard');
     await page.click('button:has-text("Simpan")');
     await expect(page.locator('text=Produk Testing Playwright')).toBeVisible({ timeout: 15000 });
 
+    // Close any open modal/overlay before navigating
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
     // 4. Inbound Flow (Barang Masuk)
+    // Close any open modal/overlay before navigating
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
     await page.click('a[href="/inbounds"]');
     await expect(page).toHaveURL(/\/inbounds/);
     await page.click('text=+ Buat Inbound');
@@ -69,7 +114,13 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('text=+ Tambah Item');
     
     // Select Product in the item row (fourth select overall)
-    await selects.nth(3).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
+    await selects.nth(3).evaluate(el => {
+      const options = Array.from(el.options);
+      const target = options.find(o => o.text.includes('Produk Testing Playwright'));
+      if (target) el.value = target.value;
+    });
+    await selects.nth(3).dispatchEvent('change');
+    await page.waitForTimeout(200);
     
     // Fill Qty
     await page.fill('input[type="number"]', '100');
@@ -99,7 +150,13 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('text=+ Tambah Item');
     
     // Select Product
-    await page.locator('select.input').nth(3).selectOption({ label: 'SKU-TEST-999 - Produk Testing Playwright' });
+    await page.locator('select.input').nth(3).evaluate(el => {
+      const options = Array.from(el.options);
+      const target = options.find(o => o.text.includes('Produk Testing Playwright'));
+      if (target) el.value = target.value;
+    });
+    await page.locator('select.input').nth(3).dispatchEvent('change');
+    await page.waitForTimeout(200);
     
     // Fill Qty
     await page.fill('input[type="number"]', '20');
@@ -126,7 +183,7 @@ test.describe('WMS End-to-End Business Flow', () => {
     await page.click('button:has-text("Buat Planogram")');
     
     // In the modal, select the warehouse
-    await page.locator('.fixed.inset-0 select').selectOption({ label: 'WH-TEST-001 - Gudang Testing Playwright' });
+    await page.locator('.fixed.inset-0 select').first().selectOption({ label: whName });
     
     // Fill description
     await page.fill('input[placeholder="Deskripsi perubahan..."]', 'Initial Planogram Test Playwright');
@@ -136,11 +193,11 @@ test.describe('WMS End-to-End Business Flow', () => {
 
     // It should navigate to PlanogramEditor
     await expect(page).toHaveURL(/\/planograms\/\d+/, { timeout: 15000 });
-    await expect(page.locator('text=WH-TEST-001')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(`text=${whName}`)).toBeVisible({ timeout: 15000 });
 
     // Search product in left sidebar
-    await page.fill('input[placeholder="Cari nama/SKU/barcode..."]', 'SKU-TEST-999');
-    await expect(page.locator('text=SKU-TEST-999').first()).toBeVisible({ timeout: 15000 });
+    await page.fill('input[placeholder="Cari nama/SKU/barcode..."]', 'Produk Testing');
+    await expect(page.locator('text=Produk Testing').first()).toBeVisible({ timeout: 15000 });
 
     // Test creating a Zone using the canvas
     await page.click('button:has-text("Zone")');

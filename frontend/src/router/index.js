@@ -99,6 +99,16 @@ const routes = [
         component: () => import('../views/Reports.vue')
       },
       {
+        path: 'returns/:id',
+        name: 'ReturnDetail',
+        component: () => import('../views/ReturnDetail.vue')
+      },
+      {
+        path: 'returns',
+        name: 'Returns',
+        component: () => import('../views/Returns.vue')
+      },
+      {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('../views/Notifications.vue')

@@ -117,7 +117,7 @@ class WarehouseSeeder extends Seeder
         }
 
         // ─── RACKS for WH002 Zone A ──────────────────────────
-        foreach (['A-01', 'A-02'] as $i => $rackCode) {
+        foreach (['DA-01', 'DA-02'] as $i => $rackCode) {
             $this->createRackWithSlots($zoneD, $rackCode, 100 + ($i * 200), 100, 300, 80, 200, 3, 4, 100, 100, null, 100);
         }
 

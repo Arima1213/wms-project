@@ -49,9 +49,10 @@ return new class extends Migration
         });
 
         // Transfers — source/dest warehouse lookups
+        // source_warehouse_id+status already indexed in create migration
+        // Adding dest_warehouse_id+status for reverse lookup
         Schema::table('transfers', function (Blueprint $table) {
-            $table->index(['from_warehouse_id', 'status'], 'idx_transfer_from_status');
-            $table->index(['to_warehouse_id', 'status'], 'idx_transfer_to_status');
+            $table->index(['dest_warehouse_id', 'status'], 'idx_transfer_dest_status');
         });
 
         // Stock opnames — warehouse scoping
