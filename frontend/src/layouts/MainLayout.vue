@@ -192,6 +192,7 @@ const menuItems = [
   { to: '/stock-opnames', label: 'Stock Opname', icon: ClipboardDocumentListIcon },
   { to: '/transfers', label: 'Transfer Stok', icon: ArrowUpCircleIcon },
   { to: '/returns', label: 'Retur', icon: ArrowUturnLeftIcon },
+  { to: '/bins', label: 'Bin / Lokasi', icon: ServerStackIcon },
   { to: '/planograms', label: 'Planogram', icon: MapIcon },
   { to: '/reports', label: 'Laporan', icon: ChartBarIcon },
   { to: '/notifications', label: 'Notifikasi', icon: BellIcon },

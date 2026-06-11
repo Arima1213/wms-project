@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\AuditLogController;
+use App\Http\Controllers\Api\V1\BinController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -61,9 +62,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::put('/racks/{rack}/position', [RackController::class, 'updatePosition']);
 
     Route::apiResource('rack-slots', RackSlotController::class);
-    Route::put('/rack-slots/{slot}/assign', [RackSlotController::class, 'assignProduct']);
-    Route::put('/rack-slots/{slot}/unassign', [RackSlotController::class, 'unassignProduct']);
-    Route::put('/rack-slots/{slot}/reserve', [RackSlotController::class, 'reserve']);
+        Route::put('/rack-slots/{slot}/assign', [RackSlotController::class, 'assignProduct']);
+        Route::put('/rack-slots/{slot}/unassign', [RackSlotController::class, 'unassignProduct']);
+        Route::put('/rack-slots/{slot}/reserve', [RackSlotController::class, 'reserve']);
+
+        Route::apiResource('bins', BinController::class);
+        Route::post('/bins/{bin}/toggle-active', [BinController::class, 'toggleActive']);
+        Route::get('/bins/{bin}/occupancy', [BinController::class, 'occupancy']);
 
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('products', ProductController::class);

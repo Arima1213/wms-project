@@ -84,6 +84,16 @@ const routes = [
         component: () => import('../views/Transfers.vue')
       },
       {
+        path: 'bins/:id',
+        name: 'BinDetail',
+        component: () => import('../views/BinDetail.vue')
+      },
+      {
+        path: 'bins',
+        name: 'Bins',
+        component: () => import('../views/Bins.vue')
+      },
+      {
         path: 'planograms',
         name: 'Planograms',
         component: () => import('../views/Planograms.vue')
