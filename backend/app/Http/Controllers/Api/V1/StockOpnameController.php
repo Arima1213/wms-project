@@ -98,21 +98,36 @@ class StockOpnameController extends Controller
             }
 
             if (isset($validated['items'])) {
-                // Upsert items using product_id as unique key to prevent data loss on crash
-                foreach ($validated['items'] as $item) {
-                    $opname->items()->updateOrCreate(
-                        ['product_id' => $item['product_id']],
-                        [
-                            'slot_id' => $item['slot_id'] ?? null,
-                            'system_qty' => $item['system_qty'],
-                            'counted_qty' => $item['actual_qty'],
-                            'variance' => $item['difference_qty'],
-                            'variance_status' => $item['difference_qty'] == 0 ? 'match' : ($item['difference_qty'] > 0 ? 'over' : 'short'),
+                // Upsert items using product_id + slot_id as composite key to prevent data loss on crash
+                $existingItemIds = collect($validated['items'])
+                    ->map(function ($itemData) use ($opname, $request) {
+                        $existing = $opname->items()
+                            ->where('product_id', $itemData['product_id'])
+                            ->where('slot_id', $itemData['slot_id'] ?? null)
+                            ->first();
+
+                        $data = [
+                            'product_id' => $itemData['product_id'],
+                            'slot_id' => $itemData['slot_id'] ?? null,
+                            'system_qty' => $itemData['system_qty'],
+                            'counted_qty' => $itemData['actual_qty'],
+                            'variance' => $itemData['difference_qty'],
+                            'variance_status' => $itemData['difference_qty'] == 0 ? 'match' : ($itemData['difference_qty'] > 0 ? 'over' : 'short'),
                             'counted_by' => $request->user()->id,
                             'counted_at' => now(),
-                        ]
-                    );
-                }
+                        ];
+
+                        if ($existing) {
+                            $existing->update($data);
+                            return $existing->id;
+                        }
+
+                        $newItem = $opname->items()->create($data);
+                        return $newItem->id;
+                    });
+
+                // Soft-delete items that are no longer in the updated list
+                $opname->items()->whereNotIn('id', $existingItemIds)->delete();
             }
             DB::commit();
             return response()->json(['data' => new StockOpnameResource($opname->load('items.product', 'warehouse', 'user'))]);
