@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
-use App\Models\StockTransaction;
+use Illuminate\Support\Facades\Cache;
 use App\Services\UomConversionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -205,6 +205,7 @@ class InventoryService
                 $remainingQty -= $taken;
             }
 
+            $this->bustReportCache();
             return $movements;
         });
     }
@@ -277,6 +278,8 @@ class InventoryService
                 'created_by' => $userId,
                 'created_at' => now(),
             ]);
+
+            $this->bustReportCache();
         });
     }
 
@@ -357,6 +360,17 @@ class InventoryService
                 'created_by' => $userId,
                 'created_at' => now(),
             ]);
+
+            $this->bustReportCache();
         });
+    }
+
+    /**
+     * Invalidate all report caches by bumping a version counter.
+     * Called automatically on any stock mutation.
+     */
+    private function bustReportCache(): void
+    {
+        Cache::increment('report_cache_version');
     }
 }

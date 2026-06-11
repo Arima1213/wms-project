@@ -24,6 +24,11 @@ class ReportController extends Controller
     /**
      * Enforce a maximum per_page cap to prevent abuse and OOM.
      */
+    private function reportVersion(): string
+    {
+        return 'v' . Cache::get('report_cache_version', 0);
+    }
+
     private function maxPerPage(Request $request, int $default = 50): int
     {
         return min((int) $request->get('per_page', $default), 100);
@@ -32,7 +37,7 @@ class ReportController extends Controller
     public function stock(Request $request): JsonResponse
     {
         $ttl = 300; // 5 minutes — stock can change frequently
-        $cacheKey = 'report:stock:' . md5(json_encode($request->only(['warehouse_id', 'category_id', 'per_page', 'page'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':stock:' . md5(json_encode($request->only(['warehouse_id', 'category_id', 'per_page', 'page'])));
 
         $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
             $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
@@ -48,7 +53,7 @@ class ReportController extends Controller
     public function mutations(Request $request): JsonResponse
     {
         $ttl = 300; // 5 minutes
-        $cacheKey = 'report:mutations:' . md5(json_encode($request->only(['warehouse_id', 'product_id', 'type', 'from', 'to', 'per_page', 'page'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':mutations:' . md5(json_encode($request->only(['warehouse_id', 'product_id', 'type', 'from', 'to', 'per_page', 'page'])));
 
         $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
             $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
@@ -71,7 +76,7 @@ class ReportController extends Controller
         $warehouseId = $request->warehouse_id;
 
         $ttl = 900; // 15 minutes — aging data changes slowly
-        $cacheKey = 'report:aging:' . md5(json_encode($request->only(['days', 'warehouse_id', 'per_page', 'page'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':aging:' . md5(json_encode($request->only(['days', 'warehouse_id', 'per_page', 'page'])));
 
         $aging = Cache::remember($cacheKey, $ttl, function () use ($days, $warehouseId, $request) {
             // Products that haven't moved in N days
@@ -104,7 +109,7 @@ class ReportController extends Controller
         $warehouseId = $request->warehouse_id;
 
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:expiry:' . md5(json_encode($request->only(['within_days', 'warehouse_id', 'per_page', 'page'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':expiry:' . md5(json_encode($request->only(['within_days', 'warehouse_id', 'per_page', 'page'])));
 
         $data = Cache::remember($cacheKey, $ttl, function () use ($within, $warehouseId, $request) {
             return Inventory::with(['product:id,sku,name', 'warehouse:id,code,name'])
@@ -123,7 +128,7 @@ class ReportController extends Controller
         $warehouseId = $request->warehouse_id;
 
         $ttl = 900; // 15 minutes — warehouse structure rarely changes
-        $cacheKey = 'report:utilization:' . md5(json_encode($request->only(['warehouse_id'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':utilization:' . md5(json_encode($request->only(['warehouse_id'])));
 
         $result = Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             $result = collect();
@@ -173,7 +178,7 @@ class ReportController extends Controller
     public function activity(Request $request): JsonResponse
     {
         $ttl = 300; // 5 minutes
-        $cacheKey = 'report:activity:' . md5(json_encode($request->only(['warehouse_id', 'per_page', 'page'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':activity:' . md5(json_encode($request->only(['warehouse_id', 'per_page', 'page'])));
 
         $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
             return StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
@@ -190,7 +195,7 @@ class ReportController extends Controller
         $warehouseId = $request->warehouse_id;
 
         $ttl = 900; // 15 minutes — valuation changes with stock, but not extremely volatile
-        $cacheKey = 'report:valuation:' . md5(json_encode($request->only(['warehouse_id'])));
+        $cacheKey = 'report:' . $this->reportVersion() . ':valuation:' . md5(json_encode($request->only(['warehouse_id'])));
 
         $result = Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             $valuation = DB::table('inventory as i')
@@ -309,7 +314,7 @@ class ReportController extends Controller
     private function getStockData($warehouseId): array
     {
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:export:stock:' . md5(json_encode(['warehouse_id' => $warehouseId]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:stock:' . md5(json_encode(['warehouse_id' => $warehouseId]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
@@ -321,7 +326,7 @@ class ReportController extends Controller
     private function getMutationData($warehouseId, array $params): array
     {
         $ttl = 600; // 10 minutes — mutations for export
-        $cacheKey = 'report:export:mutations:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:mutations:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
             $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
@@ -338,7 +343,7 @@ class ReportController extends Controller
     private function getValuationData($warehouseId): array
     {
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:export:valuation:' . md5(json_encode(['warehouse_id' => $warehouseId]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:valuation:' . md5(json_encode(['warehouse_id' => $warehouseId]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             $val = DB::table('inventory as i')
@@ -381,7 +386,7 @@ class ReportController extends Controller
     private function getAgingData($warehouseId, array $params): array
     {
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:export:aging:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:aging:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
             $days = (int) ($params['days'] ?? 30);
@@ -409,7 +414,7 @@ class ReportController extends Controller
     private function getExpiryData($warehouseId, array $params): array
     {
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:export:expiry:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:expiry:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
             $within = (int) ($params['within_days'] ?? 30);
@@ -426,7 +431,7 @@ class ReportController extends Controller
     private function getActivityData($warehouseId, array $params): array
     {
         $ttl = 600; // 10 minutes
-        $cacheKey = 'report:export:activity:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:activity:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             return StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
@@ -441,7 +446,7 @@ class ReportController extends Controller
     private function getUtilizationData($warehouseId): array
     {
         $ttl = 900; // 15 minutes
-        $cacheKey = 'report:export:utilization:' . md5(json_encode(['warehouse_id' => $warehouseId]));
+        $cacheKey = 'report:' . $this->reportVersion() . ':export:utilization:' . md5(json_encode(['warehouse_id' => $warehouseId]));
 
         return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
             $result = [];
