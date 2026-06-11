@@ -109,29 +109,21 @@ const routes = [
         component: () => import('../views/Reports.vue')
       },
       {
-        path: 'returns/:id',
-        name: 'ReturnDetail',
-        component: () => import('../views/ReturnDetail.vue')
-      },
-      {
         path: 'returns',
         name: 'Returns',
-        component: () => import('../views/Returns.vue')
+        component: () => import('../views/Returns.vue'),
+        meta: { requiresAuth: true, permission: 'manage returns' }
+      },
+      {
+        path: 'returns/:id',
+        name: 'ReturnDetail',
+        component: () => import('../views/ReturnDetail.vue'),
+        meta: { requiresAuth: true, permission: 'manage returns' }
       },
       {
         path: 'notifications',
         name: 'Notifications',
         component: () => import('../views/Notifications.vue')
-      },
-      {
-        path: 'returns',
-        name: 'Returns',
-        component: () => import('../views/Returns.vue')
-      },
-      {
-        path: 'returns/:id',
-        name: 'ReturnDetail',
-        component: () => import('../views/ReturnDetail.vue')
       },
       {
         path: 'settings',
@@ -148,17 +140,20 @@ const routes = [
       {
         path: 'documents',
         name: 'Documents',
-        component: () => import('../views/Documents.vue')
+        component: () => import('../views/Documents.vue'),
+        meta: { requiresAuth: true, permission: 'view documents' }
       },
       {
         path: 'zones',
         name: 'Zones',
-        component: () => import('../views/Zones.vue')
+        component: () => import('../views/Zones.vue'),
+        meta: { requiresAuth: true, permission: 'manage zones' }
       },
       {
         path: 'racks',
         name: 'Racks',
-        component: () => import('../views/Racks.vue')
+        component: () => import('../views/Racks.vue'),
+        meta: { requiresAuth: true, permission: 'manage racks' }
       }
     ]
   }
