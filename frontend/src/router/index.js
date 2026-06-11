@@ -104,6 +104,16 @@ const routes = [
         component: () => import('../views/Notifications.vue')
       },
       {
+        path: 'returns',
+        name: 'Returns',
+        component: () => import('../views/Returns.vue')
+      },
+      {
+        path: 'returns/:id',
+        name: 'ReturnDetail',
+        component: () => import('../views/ReturnDetail.vue')
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/Settings.vue')
@@ -137,8 +147,18 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
+// Init lock — cegah multiple init bersamaan
+let initPromise = null
+
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+
+  // Init sekali saat pertama kali route guard dipanggil
+  if (!authStore.initialized) {
+    if (!initPromise) initPromise = authStore.init()
+    await initPromise
+  }
+
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next({ name: 'Login' })
   } else if (to.meta.guest && authStore.isLoggedIn) {

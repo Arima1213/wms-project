@@ -24,6 +24,6 @@ class ReturnItem extends Model
         static::creating(fn($m) => $m->uuid = $m->uuid ?? Str::uuid());
     }
 
-    public function returnModel() { return $this->belongsTo(Return::class); }
+    public function returnModel() { return $this->belongsTo(Returns::class, 'return_id'); }
     public function product() { return $this->belongsTo(Product::class); }
 }
