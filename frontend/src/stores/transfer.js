@@ -70,6 +70,7 @@ export const useTransferStore = defineStore('transfer', {
         const res = await transferAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Pengajuan transfer berhasil dibuat')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -83,6 +84,7 @@ export const useTransferStore = defineStore('transfer', {
         const res = await transferAPI.approve(id)
         const notify = useNotificationStore()
         notify.success('Transfer disetujui')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -96,6 +98,7 @@ export const useTransferStore = defineStore('transfer', {
         const res = await transferAPI.reject(id)
         const notify = useNotificationStore()
         notify.success('Transfer ditolak')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -109,12 +112,17 @@ export const useTransferStore = defineStore('transfer', {
         const res = await transferAPI.execute(id)
         const notify = useNotificationStore()
         notify.success('Transfer berhasil dieksekusi')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal mengeksekusi transfer')
         throw error
       }
+    },
+
+    clearSelected() {
+      this.selected = null
     }
   }
 })

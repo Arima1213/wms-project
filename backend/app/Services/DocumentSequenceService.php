@@ -7,6 +7,17 @@ use Illuminate\Support\Facades\DB;
 class DocumentSequenceService
 {
     /**
+     * Alias for getNextNumber() — generate nomor dokumen berikutnya.
+     *
+     * @param string $prefix  Kode prefix, misal: 'INB', 'OUT', 'TRF', 'SO'
+     * @return string         Contoh: INB-20260610-000001
+     */
+    public function generate(string $prefix = 'DOC'): string
+    {
+        return $this->getNextNumber($prefix);
+    }
+
+    /**
      * Generate nomor dokumen dengan format: {PREFIX}-YYYYMMDD-XXXXXX
      * Menggunakan DB row lock + upsert untuk menjamin uniqueness tanpa collision.
      *

@@ -78,6 +78,7 @@ export const useStockStore = defineStore('stock', {
         const res = await stockOpnameAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Penyesuaian stok berhasil disimpan')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()

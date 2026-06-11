@@ -62,6 +62,7 @@ export const useInboundStore = defineStore('inbound', {
         const res = await inboundAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Inbound berhasil dibuat')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -75,6 +76,7 @@ export const useInboundStore = defineStore('inbound', {
         const res = await inboundAPI.receive(id, data)
         const notify = useNotificationStore()
         notify.success('Proses penerimaan (Receive) berhasil')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -88,12 +90,17 @@ export const useInboundStore = defineStore('inbound', {
         const res = await inboundAPI.cancel(id)
         const notify = useNotificationStore()
         notify.success('Inbound dibatalkan')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal membatalkan inbound')
         throw error
       }
+    },
+
+    clearSelected() {
+      this.selected = null
     }
   }
 })

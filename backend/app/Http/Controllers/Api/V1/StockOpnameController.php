@@ -98,19 +98,20 @@ class StockOpnameController extends Controller
             }
 
             if (isset($validated['items'])) {
-                // Clear existing items and recreate
-                $opname->items()->delete();
+                // Upsert items using product_id as unique key to prevent data loss on crash
                 foreach ($validated['items'] as $item) {
-                    $opname->items()->create([
-                        'product_id' => $item['product_id'],
-                        'slot_id' => $item['slot_id'] ?? null,
-                        'system_qty' => $item['system_qty'],
-                        'counted_qty' => $item['actual_qty'],
-                        'variance' => $item['difference_qty'],
-                        'variance_status' => $item['difference_qty'] == 0 ? 'match' : ($item['difference_qty'] > 0 ? 'over' : 'short'),
-                        'counted_by' => $request->user()->id,
-                        'counted_at' => now(),
-                    ]);
+                    $opname->items()->updateOrCreate(
+                        ['product_id' => $item['product_id']],
+                        [
+                            'slot_id' => $item['slot_id'] ?? null,
+                            'system_qty' => $item['system_qty'],
+                            'counted_qty' => $item['actual_qty'],
+                            'variance' => $item['difference_qty'],
+                            'variance_status' => $item['difference_qty'] == 0 ? 'match' : ($item['difference_qty'] > 0 ? 'over' : 'short'),
+                            'counted_by' => $request->user()->id,
+                            'counted_at' => now(),
+                        ]
+                    );
                 }
             }
             DB::commit();
@@ -144,5 +145,17 @@ class StockOpnameController extends Controller
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    public function cancel(Request $request, string|int $opname): JsonResponse
+    {
+        $opname = StockOpname::findOrFail($opname);
+        $this->authorize('cancel', $opname);
+
+        if (in_array($opname->status, ['approved', 'cancelled'])) {
+            return response()->json(['message' => 'Cannot cancel this stock opname'], 422);
+        }
+        $opname->update(['status' => 'cancelled']);
+        return response()->json(['data' => new StockOpnameResource($opname->load('warehouse', 'user'))]);
     }
 }

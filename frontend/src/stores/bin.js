@@ -42,20 +42,24 @@ export const useBinStore = defineStore('bin', {
 
     async createBin(data) {
       const res = await api.post('/bins', data)
+      await this.fetchBins()
       return res.data.data || res.data
     },
 
     async updateBin(id, data) {
       const res = await api.put(`/bins/${id}`, data)
+      await this.fetchBins()
       return res.data.data || res.data
     },
 
     async deleteBin(id) {
       await api.delete(`/bins/${id}`)
+      await this.fetchBins()
     },
 
     async toggleActive(id) {
       const res = await api.post(`/bins/${id}/toggle-active`)
+      await this.fetchBins()
       return res.data.data || res.data
     },
 
@@ -63,5 +67,9 @@ export const useBinStore = defineStore('bin', {
       const res = await api.get(`/bins/${id}/occupancy`)
       return res.data
     },
+
+    clearSelected() {
+      this.item = null
+    }
   },
 })

@@ -31,4 +31,19 @@ class StockOpnamePolicy
     {
         return $user->hasPermissionTo('approve stock_opnames');
     }
+
+    public function start(User $user, StockOpname $opname): bool
+    {
+        return $user->hasPermissionTo('edit stock_opnames');
+    }
+
+    public function submit(User $user, StockOpname $opname): bool
+    {
+        return $user->hasPermissionTo('edit stock_opnames');
+    }
+
+    public function cancel(User $user, StockOpname $opname): bool
+    {
+        return $user->hasPermissionTo('edit stock_opnames');
+    }
 }

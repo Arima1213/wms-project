@@ -27,9 +27,11 @@ export const useDocumentStore = defineStore('document', {
     },
     async upload(formData) {
       await documentAPI.upload(formData)
+      await this.fetchList()
     },
     async remove(id) {
       await documentAPI.delete(id)
+      await this.fetchList()
     }
   }
 })

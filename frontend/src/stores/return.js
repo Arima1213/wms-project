@@ -41,41 +41,53 @@ export const useReturnStore = defineStore('return', {
 
     async createReturn(data) {
       const res = await api.post('/returns', data)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async updateReturn(id, data) {
       const res = await api.put(`/returns/${id}`, data)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async deleteReturn(id) {
       await api.delete(`/returns/${id}`)
+      await this.fetchReturns()
     },
 
     async submitReturn(id) {
       const res = await api.post(`/returns/${id}/submit`)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async approveReturn(id) {
       const res = await api.post(`/returns/${id}/approve`)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async processReturn(id) {
       const res = await api.post(`/returns/${id}/process`)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async rejectReturn(id, reason = '') {
       const res = await api.post(`/returns/${id}/reject`, { reason })
+      await this.fetchReturns()
       return res.data.data || res.data
     },
 
     async cancelReturn(id) {
       const res = await api.post(`/returns/${id}/cancel`)
+      await this.fetchReturns()
       return res.data.data || res.data
     },
+
+    clearSelected() {
+      this.item = null
+    }
   },
 })

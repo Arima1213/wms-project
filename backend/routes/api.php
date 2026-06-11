@@ -99,6 +99,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/stock-opnames/{opname}/start', [StockOpnameController::class, 'start']);
     Route::post('/stock-opnames/{opname}/submit', [StockOpnameController::class, 'submit']);
     Route::post('/stock-opnames/{opname}/approve', [StockOpnameController::class, 'approve']);
+    Route::post('/stock-opnames/{opname}/cancel', [StockOpnameController::class, 'cancel']);
 
     Route::get('/warehouses/{warehouse}/planogram', [PlanogramController::class, 'show']);
     Route::put('/warehouses/{warehouse}/planogram', [PlanogramController::class, 'update']);

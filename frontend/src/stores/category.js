@@ -44,6 +44,7 @@ export const useCategoryStore = defineStore('category', {
         const res = await categoryAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Kategori berhasil ditambahkan')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -57,6 +58,7 @@ export const useCategoryStore = defineStore('category', {
         const res = await categoryAPI.update(id, data)
         const notify = useNotificationStore()
         notify.success('Kategori berhasil diperbarui')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -70,6 +72,7 @@ export const useCategoryStore = defineStore('category', {
         await categoryAPI.delete(id)
         const notify = useNotificationStore()
         notify.success('Kategori berhasil dihapus')
+        await this.fetchList()
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal menghapus kategori')

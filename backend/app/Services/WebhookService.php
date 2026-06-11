@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Jobs\DeliverWebhookJob;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WebhookService
@@ -26,7 +26,8 @@ class WebhookService
 
     /**
      * Send a webhook for a given event with payload.
-     * Creates a delivery record and fires the HTTP request.
+     * Creates a delivery record and dispatches an async queue job
+     * to perform the actual HTTP call.
      */
     public function send(Webhook $webhook, string $event, array $payload): WebhookDelivery
     {
@@ -37,7 +38,9 @@ class WebhookService
             'attempt' => 1,
         ]);
 
-        return $this->attemptDelivery($delivery);
+        DeliverWebhookJob::dispatch($webhook, $delivery, $event, $payload);
+
+        return $delivery;
     }
 
     /**

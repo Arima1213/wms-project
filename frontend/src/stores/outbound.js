@@ -62,6 +62,7 @@ export const useOutboundStore = defineStore('outbound', {
         const res = await outboundAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Outbound berhasil dibuat')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -75,6 +76,7 @@ export const useOutboundStore = defineStore('outbound', {
         const res = await outboundAPI.ship(id, data)
         const notify = useNotificationStore()
         notify.success('Proses pengiriman (Ship) berhasil')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -88,6 +90,7 @@ export const useOutboundStore = defineStore('outbound', {
         const res = await outboundAPI.pick(id)
         const notify = useNotificationStore()
         notify.success('Status diubah ke Picking')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -101,12 +104,17 @@ export const useOutboundStore = defineStore('outbound', {
         const res = await outboundAPI.cancel(id)
         const notify = useNotificationStore()
         notify.success('Outbound dibatalkan')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal membatalkan outbound')
         throw error
       }
+    },
+
+    clearSelected() {
+      this.selected = null
     }
   }
 })

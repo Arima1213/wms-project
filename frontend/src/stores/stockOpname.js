@@ -71,6 +71,7 @@ export const useStockOpnameStore = defineStore('stockOpname', {
         const res = await stockOpnameAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Stock Opname berhasil dibuat')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -84,6 +85,7 @@ export const useStockOpnameStore = defineStore('stockOpname', {
         const res = await stockOpnameAPI.submit(id, data)
         const notify = useNotificationStore()
         notify.success('Stock Opname berhasil disubmit')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -97,12 +99,17 @@ export const useStockOpnameStore = defineStore('stockOpname', {
         const res = await stockOpnameAPI.approve(id, data)
         const notify = useNotificationStore()
         notify.success('Stock Opname berhasil disetujui')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal menyetujui stock opname')
         throw error
       }
+    },
+
+    clearSelected() {
+      this.selected = null
     }
   }
 })

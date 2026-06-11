@@ -23,6 +23,7 @@ export const useZoneStore = defineStore('zone', {
       try {
         await zoneAPI.create(warehouseId, data)
         notify.success('Zona berhasil ditambahkan')
+        await this.fetchList(warehouseId)
       } catch (e) {
         notify.error(e.response?.data?.message || 'Gagal menambah zona')
         throw e
@@ -33,6 +34,7 @@ export const useZoneStore = defineStore('zone', {
       try {
         await zoneAPI.update(warehouseId, id, data)
         notify.success('Zona berhasil diperbarui')
+        await this.fetchList(warehouseId)
       } catch (e) {
         notify.error(e.response?.data?.message || 'Gagal memperbarui zona')
         throw e
@@ -43,6 +45,7 @@ export const useZoneStore = defineStore('zone', {
       try {
         await zoneAPI.delete(warehouseId, id)
         notify.success('Zona berhasil dihapus')
+        await this.fetchList(warehouseId)
       } catch (e) {
         notify.error(e.response?.data?.message || 'Gagal menghapus zona')
         throw e
@@ -54,6 +57,7 @@ export const useZoneStore = defineStore('zone', {
         if (activate) await zoneAPI.activate(id)
         else await zoneAPI.deactivate(id)
         notify.success(activate ? 'Zona diaktifkan' : 'Zona dinonaktifkan')
+        await this.fetchList()
       } catch (e) {
         notify.error(e.response?.data?.message || 'Gagal mengubah status')
         throw e

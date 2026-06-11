@@ -7,6 +7,7 @@ use App\Http\Resources\InventoryResource;
 use App\Models\{Inventory, StockTransaction, Product, Warehouse};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -20,27 +21,47 @@ use Dompdf\Dompdf;
 
 class ReportController extends Controller
 {
+    /**
+     * Enforce a maximum per_page cap to prevent abuse and OOM.
+     */
+    private function maxPerPage(Request $request, int $default = 50): int
+    {
+        return min((int) $request->get('per_page', $default), 100);
+    }
+
     public function stock(Request $request): JsonResponse
     {
-        $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
-            ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
-            ->when($request->category_id, fn($q) => $q->whereHas('product', fn($pq) => $pq->where('category_id', $request->category_id)));
+        $ttl = 300; // 5 minutes — stock can change frequently
+        $cacheKey = 'report:stock:' . md5(json_encode($request->only(['warehouse_id', 'category_id', 'per_page', 'page'])));
 
-        $data = $query->paginate($request->get('per_page', 50));
+        $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
+            $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
+                ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
+                ->when($request->category_id, fn($q) => $q->whereHas('product', fn($pq) => $pq->where('category_id', $request->category_id)));
+
+            return $query->paginate($this->maxPerPage($request));
+        });
+
         return InventoryResource::collection($data);
     }
 
     public function mutations(Request $request): JsonResponse
     {
-        $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
-            ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
-            ->when($request->product_id, fn($q) => $q->where('product_id', $request->product_id))
-            ->when($request->type, fn($q) => $q->where('transaction_type', $request->type))
-            ->when($request->from, fn($q) => $q->whereDate('created_at', '>=', $request->from))
-            ->when($request->to, fn($q) => $q->whereDate('created_at', '<=', $request->to))
-            ->orderByDesc('created_at');
+        $ttl = 300; // 5 minutes
+        $cacheKey = 'report:mutations:' . md5(json_encode($request->only(['warehouse_id', 'product_id', 'type', 'from', 'to', 'per_page', 'page'])));
 
-        $data = $query->paginate($request->get('per_page', 50));
+        $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
+            $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
+                ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
+                ->when($request->product_id, fn($q) => $q->where('product_id', $request->product_id))
+                ->when($request->type, fn($q) => $q->where('transaction_type', $request->type))
+                ->when($request->from, fn($q) => $q->whereDate('created_at', '>=', $request->from))
+                ->when($request->to, fn($q) => $q->whereDate('created_at', '<=', $request->to))
+                ->orderByDesc('created_at');
+
+            return $query->paginate($this->maxPerPage($request));
+        });
+
         return response()->json($data);
     }
 
@@ -49,23 +70,30 @@ class ReportController extends Controller
         $days = (int) $request->get('days', 30);
         $warehouseId = $request->warehouse_id;
 
-        // Products that haven't moved in N days
-        $cutoff = now()->subDays($days);
+        $ttl = 900; // 15 minutes — aging data changes slowly
+        $cacheKey = 'report:aging:' . md5(json_encode($request->only(['days', 'warehouse_id', 'per_page', 'page'])));
 
-        $aging = DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->join('warehouses as w', 'i.warehouse_id', '=', 'w.id')
-            ->select('p.id', 'p.sku', 'p.name', 'w.id as warehouse_id', 'w.code as warehouse_code',
-                DB::raw('SUM(i.quantity) as total_qty'),
-                DB::raw("MAX(it.created_at) as last_movement"),
-                DB::raw("EXTRACT(DAY FROM NOW() - MAX(it.created_at)) as days_since_movement"))
-            ->leftJoin('stock_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->groupBy('p.id', 'p.sku', 'p.name', 'w.id', 'w.code')
-            ->having(DB::raw("MAX(it.created_at)"), '<', $cutoff)
-            ->orderByDesc('days_since_movement')
-            ->paginate(50);
+        $aging = Cache::remember($cacheKey, $ttl, function () use ($days, $warehouseId, $request) {
+            // Products that haven't moved in N days
+            $cutoff = now()->subDays($days);
+
+            return DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->join('warehouses as w', 'i.warehouse_id', '=', 'w.id')
+                ->select('p.id', 'p.sku', 'p.name', 'w.id as warehouse_id', 'w.code as warehouse_code',
+                    DB::raw('SUM(i.quantity) as total_qty'),
+                    DB::raw("MAX(it.created_at) as last_movement"),
+                    DB::raw("EXTRACT(DAY FROM NOW() - MAX(it.created_at)) as days_since_movement"))
+                ->leftJoin('stock_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->whereNull('p.deleted_at')
+                ->whereNull('w.deleted_at')
+                ->where('i.quantity', '>', 0)
+                ->groupBy('p.id', 'p.sku', 'p.name', 'w.id', 'w.code')
+                ->having(DB::raw("MAX(it.created_at)"), '<', $cutoff)
+                ->orderByDesc('days_since_movement')
+                ->paginate($this->maxPerPage($request));
+        });
 
         return response()->json($aging);
     }
@@ -75,12 +103,17 @@ class ReportController extends Controller
         $within = (int) $request->get('within_days', 30);
         $warehouseId = $request->warehouse_id;
 
-        $data = Inventory::with(['product:id,sku,name', 'warehouse:id,code,name'])
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
-            ->whereNotNull('expiry_date')
-            ->whereBetween('expiry_date', [now(), now()->addDays($within)])
-            ->orderBy('expiry_date')
-            ->paginate(50);
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:expiry:' . md5(json_encode($request->only(['within_days', 'warehouse_id', 'per_page', 'page'])));
+
+        $data = Cache::remember($cacheKey, $ttl, function () use ($within, $warehouseId, $request) {
+            return Inventory::with(['product:id,sku,name', 'warehouse:id,code,name'])
+                ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+                ->whereNotNull('expiry_date')
+                ->whereBetween('expiry_date', [now(), now()->addDays($within)])
+                ->orderBy('expiry_date')
+                ->paginate($this->maxPerPage($request));
+        });
 
         return InventoryResource::collection($data);
     }
@@ -88,28 +121,66 @@ class ReportController extends Controller
     public function utilization(Request $request): JsonResponse
     {
         $warehouseId = $request->warehouse_id;
-        $warehouseQuery = Warehouse::query()->when($warehouseId, fn($q) => $q->where('id', $warehouseId));
 
-        $warehouses = $warehouseQuery->with(['zones.racks.levels.slots'])->get();
+        $ttl = 900; // 15 minutes — warehouse structure rarely changes
+        $cacheKey = 'report:utilization:' . md5(json_encode($request->only(['warehouse_id'])));
 
-        $result = $warehouses->map(fn($w) => [
-            'warehouse' => ['id' => $w->id, 'code' => $w->code, 'name' => $w->name],
-            'total_zones' => $w->zones->count(),
-            'total_racks' => $w->zones->flatMap(fn($z) => $z->racks)->count(),
-            'total_slots' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))->count(),
-            'utilization' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))
-                ->filter(fn($s) => $s->status !== 'empty')->count(),
-        ]);
+        $result = Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            $result = collect();
+
+            $warehouseQuery = Warehouse::query()->when($warehouseId, fn($q) => $q->where('id', $warehouseId));
+
+            // Use chunk() to avoid loading the entire nested hierarchy into memory
+            $warehouseQuery->chunk(10, function ($warehouses) use (&$result) {
+                $warehouseIds = $warehouses->pluck('id');
+
+                // Single aggregate query per batch — far more memory-efficient
+                // than loading all zones→racks→levels→slots into Eloquent objects
+                $stats = DB::table('zones')
+                    ->select(
+                        'zones.warehouse_id',
+                        DB::raw('COUNT(DISTINCT zones.id) as total_zones'),
+                        DB::raw('COUNT(DISTINCT racks.id) as total_racks'),
+                        DB::raw('COUNT(DISTINCT rack_slots.id) as total_slots'),
+                        DB::raw('COUNT(DISTINCT CASE WHEN rack_slots.status IS NULL OR rack_slots.status != \'empty\' THEN rack_slots.id END) as used_slots')
+                    )
+                    ->leftJoin('racks', 'racks.zone_id', '=', 'zones.id')
+                    ->leftJoin('rack_levels', 'rack_levels.rack_id', '=', 'racks.id')
+                    ->leftJoin('rack_slots', 'rack_slots.rack_level_id', '=', 'rack_levels.id')
+                    ->whereIn('zones.warehouse_id', $warehouseIds)
+                    ->groupBy('zones.warehouse_id')
+                    ->get()
+                    ->keyBy('warehouse_id');
+
+                foreach ($warehouses as $w) {
+                    $s = $stats->get($w->id);
+                    $result->push([
+                        'warehouse' => ['id' => $w->id, 'code' => $w->code, 'name' => $w->name],
+                        'total_zones' => $s ? (int) $s->total_zones : 0,
+                        'total_racks' => $s ? (int) $s->total_racks : 0,
+                        'total_slots' => $s ? (int) $s->total_slots : 0,
+                        'utilization' => $s ? (int) $s->used_slots : 0,
+                    ]);
+                }
+            });
+
+            return $result;
+        });
 
         return response()->json(['data' => $result]);
     }
 
     public function activity(Request $request): JsonResponse
     {
-        $data = StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
-            ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
-            ->orderByDesc('created_at')
-            ->paginate($request->get('per_page', 50));
+        $ttl = 300; // 5 minutes
+        $cacheKey = 'report:activity:' . md5(json_encode($request->only(['warehouse_id', 'per_page', 'page'])));
+
+        $data = Cache::remember($cacheKey, $ttl, function () use ($request) {
+            return StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
+                ->when($request->warehouse_id, fn($q) => $q->where('warehouse_id', $request->warehouse_id))
+                ->orderByDesc('created_at')
+                ->paginate($this->maxPerPage($request));
+        });
 
         return response()->json($data);
     }
@@ -118,38 +189,45 @@ class ReportController extends Controller
     {
         $warehouseId = $request->warehouse_id;
 
-        $valuation = DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->select(
-                DB::raw('SUM(i.quantity) as total_quantity'),
-                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as total_value'),
-                DB::raw('COUNT(DISTINCT p.id) as total_products')
-            )
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->first();
+        $ttl = 900; // 15 minutes — valuation changes with stock, but not extremely volatile
+        $cacheKey = 'report:valuation:' . md5(json_encode($request->only(['warehouse_id'])));
 
-        $byCategory = DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->leftJoin('product_categories as c', 'p.category_id', '=', 'c.id')
-            ->select(
-                DB::raw('COALESCE(c.name, \'Tanpa Kategori\') as category'),
-                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as value'),
-                DB::raw('SUM(i.quantity) as quantity')
-            )
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->groupBy('c.name')
-            ->get();
+        $result = Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            $valuation = DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->select(
+                    DB::raw('SUM(i.quantity) as total_quantity'),
+                    DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as total_value'),
+                    DB::raw('COUNT(DISTINCT p.id) as total_products')
+                )
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->where('i.quantity', '>', 0)
+                ->whereNull('p.deleted_at')
+                ->first();
 
-        return response()->json([
-            'data' => [
+            $byCategory = DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->leftJoin('product_categories as c', 'p.category_id', '=', 'c.id')
+                ->select(
+                    DB::raw('COALESCE(c.name, \'Tanpa Kategori\') as category'),
+                    DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as value'),
+                    DB::raw('SUM(i.quantity) as quantity')
+                )
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->where('i.quantity', '>', 0)
+                ->whereNull('p.deleted_at')
+                ->groupBy('c.name')
+                ->get();
+
+            return [
                 'total_quantity' => $valuation->total_quantity ?? 0,
                 'total_value' => $valuation->total_value ?? 0,
                 'total_products' => $valuation->total_products ?? 0,
                 'by_category' => $byCategory
-            ]
-        ]);
+            ];
+        });
+
+        return response()->json(['data' => $result]);
     }
 
     public function export(Request $request)
@@ -230,116 +308,181 @@ class ReportController extends Controller
 
     private function getStockData($warehouseId): array
     {
-        $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId));
-        return $query->get()->toArray();
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:export:stock:' . md5(json_encode(['warehouse_id' => $warehouseId]));
+
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            $query = Inventory::with(['product:id,sku,name,category_id', 'product.category:id,name', 'warehouse:id,code,name'])
+                ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId));
+            return $query->get()->toArray();
+        });
     }
 
     private function getMutationData($warehouseId, array $params): array
     {
-        $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
-            ->when($params['type'] ?? null, fn($q) => $q->where('transaction_type', $params['type']))
-            ->when($params['from'] ?? null, fn($q) => $q->whereDate('created_at', '>=', $params['from']))
-            ->when($params['to'] ?? null, fn($q) => $q->whereDate('created_at', '<=', $params['to']))
-            ->orderByDesc('created_at')
-            ->limit(5000);
-        return $query->get()->toArray();
+        $ttl = 600; // 10 minutes — mutations for export
+        $cacheKey = 'report:export:mutations:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
+            $query = StockTransaction::with(['product:id,sku,name', 'warehouse:id,code,name', 'creator:id,name'])
+                ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+                ->when($params['type'] ?? null, fn($q) => $q->where('transaction_type', $params['type']))
+                ->when($params['from'] ?? null, fn($q) => $q->whereDate('created_at', '>=', $params['from']))
+                ->when($params['to'] ?? null, fn($q) => $q->whereDate('created_at', '<=', $params['to']))
+                ->orderByDesc('created_at')
+                ->limit(5000);
+            return $query->get()->toArray();
+        });
     }
 
     private function getValuationData($warehouseId): array
     {
-        $val = DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->select(
-                DB::raw('SUM(i.quantity) as total_quantity'),
-                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as total_value'),
-                DB::raw('COUNT(DISTINCT p.id) as total_products')
-            )
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->first();
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:export:valuation:' . md5(json_encode(['warehouse_id' => $warehouseId]));
 
-        $byCategory = DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->leftJoin('product_categories as c', 'p.category_id', '=', 'c.id')
-            ->select(
-                DB::raw('COALESCE(c.name, \'Tanpa Kategori\') as category'),
-                DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as value'),
-                DB::raw('SUM(i.quantity) as quantity')
-            )
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->groupBy('c.name')
-            ->get();
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            $val = DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->select(
+                    DB::raw('SUM(i.quantity) as total_quantity'),
+                    DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as total_value'),
+                    DB::raw('COUNT(DISTINCT p.id) as total_products')
+                )
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->where('i.quantity', '>', 0)
+                ->whereNull('p.deleted_at')
+                ->first();
 
-        return [
-            'summary' => [
-                'total_quantity' => $val->total_quantity ?? 0,
-                'total_value' => $val->total_value ?? 0,
-                'total_products' => $val->total_products ?? 0,
-            ],
-            'by_category' => $byCategory->toArray(),
-        ];
+            $byCategory = DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->leftJoin('product_categories as c', 'p.category_id', '=', 'c.id')
+                ->select(
+                    DB::raw('COALESCE(c.name, \'Tanpa Kategori\') as category'),
+                    DB::raw('SUM(i.quantity * COALESCE(i.unit_cost, 0)) as value'),
+                    DB::raw('SUM(i.quantity) as quantity')
+                )
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->where('i.quantity', '>', 0)
+                ->whereNull('p.deleted_at')
+                ->groupBy('c.name')
+                ->get();
+
+            return [
+                'summary' => [
+                    'total_quantity' => $val->total_quantity ?? 0,
+                    'total_value' => $val->total_value ?? 0,
+                    'total_products' => $val->total_products ?? 0,
+                ],
+                'by_category' => $byCategory->toArray(),
+            ];
+        });
     }
 
     private function getAgingData($warehouseId, array $params): array
     {
-        $days = (int) ($params['days'] ?? 30);
-        $cutoff = now()->subDays($days);
-        return DB::table('inventory as i')
-            ->join('products as p', 'i.product_id', '=', 'p.id')
-            ->join('warehouses as w', 'i.warehouse_id', '=', 'w.id')
-            ->select('p.id', 'p.sku', 'p.name', 'w.code as warehouse_code',
-                DB::raw('SUM(i.quantity) as total_qty'),
-                DB::raw('MAX(it.created_at) as last_movement'),
-                DB::raw('EXTRACT(DAY FROM NOW() - MAX(it.created_at)) as days_since_movement'))
-            ->leftJoin('stock_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
-            ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
-            ->where('i.quantity', '>', 0)
-            ->groupBy('p.id', 'p.sku', 'p.name', 'w.code')
-            ->having(DB::raw('MAX(it.created_at)'), '<', $cutoff)
-            ->orderByDesc('days_since_movement')
-            ->get()
-            ->toArray();
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:export:aging:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
+            $days = (int) ($params['days'] ?? 30);
+            $cutoff = now()->subDays($days);
+            return DB::table('inventory as i')
+                ->join('products as p', 'i.product_id', '=', 'p.id')
+                ->join('warehouses as w', 'i.warehouse_id', '=', 'w.id')
+                ->select('p.id', 'p.sku', 'p.name', 'w.code as warehouse_code',
+                    DB::raw('SUM(i.quantity) as total_qty'),
+                    DB::raw('MAX(it.created_at) as last_movement'),
+                    DB::raw('EXTRACT(DAY FROM NOW() - MAX(it.created_at)) as days_since_movement'))
+                ->leftJoin('stock_transactions as it', fn($j) => $j->on('i.product_id', '=', 'it.product_id')->on('i.warehouse_id', '=', 'it.warehouse_id'))
+                ->when($warehouseId, fn($q) => $q->where('i.warehouse_id', $warehouseId))
+                ->where('i.quantity', '>', 0)
+                ->whereNull('p.deleted_at')
+                ->whereNull('w.deleted_at')
+                ->groupBy('p.id', 'p.sku', 'p.name', 'w.code')
+                ->having(DB::raw('MAX(it.created_at)'), '<', $cutoff)
+                ->orderByDesc('days_since_movement')
+                ->get()
+                ->toArray();
+        });
     }
 
     private function getExpiryData($warehouseId, array $params): array
     {
-        $within = (int) ($params['within_days'] ?? 30);
-        return Inventory::with(['product:id,sku,name', 'warehouse:id,code,name'])
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
-            ->whereNotNull('expiry_date')
-            ->whereBetween('expiry_date', [now(), now()->addDays($within)])
-            ->orderBy('expiry_date')
-            ->get()
-            ->toArray();
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:export:expiry:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId, $params) {
+            $within = (int) ($params['within_days'] ?? 30);
+            return Inventory::with(['product:id,sku,name', 'warehouse:id,code,name'])
+                ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+                ->whereNotNull('expiry_date')
+                ->whereBetween('expiry_date', [now(), now()->addDays($within)])
+                ->orderBy('expiry_date')
+                ->get()
+                ->toArray();
+        });
     }
 
     private function getActivityData($warehouseId, array $params): array
     {
-        return StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
-            ->orderByDesc('created_at')
-            ->limit(5000)
-            ->get()
-            ->toArray();
+        $ttl = 600; // 10 minutes
+        $cacheKey = 'report:export:activity:' . md5(json_encode(['warehouse_id' => $warehouseId, 'params' => $params]));
+
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            return StockTransaction::with(['creator:id,name', 'warehouse:id,code,name', 'product:id,sku,name'])
+                ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+                ->orderByDesc('created_at')
+                ->limit(5000)
+                ->get()
+                ->toArray();
+        });
     }
 
     private function getUtilizationData($warehouseId): array
     {
-        $warehouseQuery = Warehouse::query()->when($warehouseId, fn($q) => $q->where('id', $warehouseId));
-        $warehouses = $warehouseQuery->with(['zones.racks.levels.slots'])->get();
+        $ttl = 900; // 15 minutes
+        $cacheKey = 'report:export:utilization:' . md5(json_encode(['warehouse_id' => $warehouseId]));
 
-        return $warehouses->map(fn($w) => [
-            'warehouse_name' => $w->name,
-            'warehouse_code' => $w->code,
-            'total_zones' => $w->zones->count(),
-            'total_racks' => $w->zones->flatMap(fn($z) => $z->racks)->count(),
-            'total_slots' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))->count(),
-            'utilization' => $w->zones->flatMap(fn($z) => $z->racks->flatMap(fn($r) => $r->levels->flatMap(fn($l) => $l->slots)))
-                ->filter(fn($s) => $s->status !== 'empty')->count(),
-        ])->toArray();
+        return Cache::remember($cacheKey, $ttl, function () use ($warehouseId) {
+            $result = [];
+
+            $warehouseQuery = Warehouse::query()->when($warehouseId, fn($q) => $q->where('id', $warehouseId));
+
+            // Use chunk to avoid loading entire nested hierarchy into memory
+            $warehouseQuery->chunk(10, function ($warehouses) use (&$result) {
+                $warehouseIds = $warehouses->pluck('id');
+
+                $stats = DB::table('zones')
+                    ->select(
+                        'zones.warehouse_id',
+                        DB::raw('COUNT(DISTINCT zones.id) as total_zones'),
+                        DB::raw('COUNT(DISTINCT racks.id) as total_racks'),
+                        DB::raw('COUNT(DISTINCT rack_slots.id) as total_slots'),
+                        DB::raw('COUNT(DISTINCT CASE WHEN rack_slots.status IS NULL OR rack_slots.status != \'empty\' THEN rack_slots.id END) as used_slots')
+                    )
+                    ->leftJoin('racks', 'racks.zone_id', '=', 'zones.id')
+                    ->leftJoin('rack_levels', 'rack_levels.rack_id', '=', 'racks.id')
+                    ->leftJoin('rack_slots', 'rack_slots.rack_level_id', '=', 'rack_levels.id')
+                    ->whereIn('zones.warehouse_id', $warehouseIds)
+                    ->groupBy('zones.warehouse_id')
+                    ->get()
+                    ->keyBy('warehouse_id');
+
+                foreach ($warehouses as $w) {
+                    $s = $stats->get($w->id);
+                    $result[] = [
+                        'warehouse_name' => $w->name,
+                        'warehouse_code' => $w->code,
+                        'total_zones' => $s ? (int) $s->total_zones : 0,
+                        'total_racks' => $s ? (int) $s->total_racks : 0,
+                        'total_slots' => $s ? (int) $s->total_slots : 0,
+                        'utilization' => $s ? (int) $s->used_slots : 0,
+                    ];
+                }
+            });
+
+            return $result;
+        });
     }
 
     private function formatExportData(string $type, array $data): array

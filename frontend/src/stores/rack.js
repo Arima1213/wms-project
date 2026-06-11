@@ -19,17 +19,17 @@ export const useRackStore = defineStore('rack', {
     },
     async create(zoneId, data) {
       const notify = useNotificationStore()
-      try { await rackAPI.create(zoneId, data); notify.success('Rak berhasil ditambahkan') }
+      try { await rackAPI.create(zoneId, data); notify.success('Rak berhasil ditambahkan'); await this.fetchList(zoneId) }
       catch (e) { notify.error(e.response?.data?.message || 'Gagal'); throw e }
     },
     async update(zoneId, id, data) {
       const notify = useNotificationStore()
-      try { await rackAPI.update(zoneId, id, data); notify.success('Rak berhasil diperbarui') }
+      try { await rackAPI.update(zoneId, id, data); notify.success('Rak berhasil diperbarui'); await this.fetchList(zoneId) }
       catch (e) { notify.error(e.response?.data?.message || 'Gagal'); throw e }
     },
     async remove(zoneId, id) {
       const notify = useNotificationStore()
-      try { await rackAPI.delete(zoneId, id); notify.success('Rak berhasil dihapus') }
+      try { await rackAPI.delete(zoneId, id); notify.success('Rak berhasil dihapus'); await this.fetchList(zoneId) }
       catch (e) { notify.error(e.response?.data?.message || 'Gagal'); throw e }
     }
   }

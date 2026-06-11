@@ -136,12 +136,14 @@ const routes = [
       {
         path: 'settings',
         name: 'Settings',
-        component: () => import('../views/Settings.vue')
+        component: () => import('../views/Settings.vue'),
+        meta: { requiresAuth: true, permission: 'view settings' }
       },
       {
         path: 'audit-logs',
         name: 'AuditLogs',
-        component: () => import('../views/AuditLogs.vue')
+        component: () => import('../views/AuditLogs.vue'),
+        meta: { requiresAuth: true, permission: 'view audit logs' }
       },
       {
         path: 'documents',
@@ -182,6 +184,8 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next({ name: 'Login' })
   } else if (to.meta.guest && authStore.isLoggedIn) {
+    next({ name: 'Dashboard' })
+  } else if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
     next({ name: 'Dashboard' })
   } else {
     next()

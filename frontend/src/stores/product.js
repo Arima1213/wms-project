@@ -63,6 +63,7 @@ export const useProductStore = defineStore('product', {
         const res = await productAPI.create(data)
         const notify = useNotificationStore()
         notify.success('Produk berhasil ditambahkan')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -76,6 +77,7 @@ export const useProductStore = defineStore('product', {
         const res = await productAPI.update(id, data)
         const notify = useNotificationStore()
         notify.success('Produk berhasil diperbarui')
+        await this.fetchList()
         return res
       } catch (error) {
         const notify = useNotificationStore()
@@ -89,12 +91,16 @@ export const useProductStore = defineStore('product', {
         await productAPI.delete(id)
         const notify = useNotificationStore()
         notify.success('Produk berhasil dihapus')
-        this.products = this.products.filter(p => p.id !== id)
+        await this.fetchList()
       } catch (error) {
         const notify = useNotificationStore()
         notify.error(error.response?.data?.message || 'Gagal menghapus produk')
         throw error
       }
+    },
+
+    clearSelected() {
+      this.selected = null
     }
   }
 })

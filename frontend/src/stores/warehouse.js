@@ -55,6 +55,7 @@ export const useWarehouseStore = defineStore('warehouse', () => {
     try {
       const res = await warehouseAPI.create(data)
       notify.success('Gudang berhasil ditambahkan')
+      await fetchList()
       return res.data || res
     } catch (e) {
       notify.error(e.response?.data?.message || 'Gagal menambah gudang')
@@ -66,6 +67,7 @@ export const useWarehouseStore = defineStore('warehouse', () => {
     try {
       const res = await warehouseAPI.update(id, data)
       notify.success('Gudang berhasil diperbarui')
+      await fetchList()
       return res.data || res
     } catch (e) {
       notify.error(e.response?.data?.message || 'Gagal memperbarui gudang')
@@ -77,16 +79,20 @@ export const useWarehouseStore = defineStore('warehouse', () => {
     try {
       await warehouseAPI.delete(id)
       notify.success('Gudang berhasil dihapus')
-      warehouses.value = warehouses.value.filter(w => w.id !== id)
+      await fetchList()
     } catch (e) {
       notify.error(e.response?.data?.message || 'Gagal menghapus gudang')
       throw e
     }
   }
 
+  function clearSelected() {
+    selected.value = null
+  }
+
   return {
     warehouses, selected, loading, pagination,
     activeWarehouses,
-    fetchList, fetchOne, create, update, remove,
+    fetchList, fetchOne, create, update, remove, clearSelected,
   }
 })

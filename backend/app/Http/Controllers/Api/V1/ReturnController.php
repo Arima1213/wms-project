@@ -38,10 +38,9 @@ class ReturnController extends Controller
         return ReturnResource::collection($returns);
     }
 
-    public function show(string|int $id): ReturnResource
+    public function show(ReturnModel $return): ReturnResource
     {
-        $return = ReturnModel::with(['warehouse', 'customer', 'supplier', 'creator', 'items.product'])
-            ->findOrFail($id);
+        $return->loadMissing(['warehouse', 'customer', 'supplier', 'creator', 'items.product']);
         return new ReturnResource($return);
     }
 
@@ -51,10 +50,8 @@ class ReturnController extends Controller
         return response()->json(new ReturnResource($return), 201);
     }
 
-    public function update(UpdateReturnRequest $request, string|int $id): JsonResponse
+    public function update(UpdateReturnRequest $request, ReturnModel $return): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
-
         if (!in_array($return->status, ['draft', 'pending'])) {
             return response()->json(['message' => 'Cannot modify non-draft/pending return.'], 422);
         }
@@ -63,9 +60,8 @@ class ReturnController extends Controller
         return response()->json(new ReturnResource($return->fresh()->loadMissing(['items.product', 'warehouse'])));
     }
 
-    public function destroy(string|int $id): JsonResponse
+    public function destroy(ReturnModel $return): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         if (!in_array($return->status, ['draft', 'cancelled'])) {
             return response()->json(['message' => 'Only draft/cancelled returns can be deleted.'], 422);
         }
@@ -73,9 +69,8 @@ class ReturnController extends Controller
         return response()->json(null, 204);
     }
 
-    public function submit(string|int $id, Request $request): JsonResponse
+    public function submit(ReturnModel $return, Request $request): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         if ($return->status !== 'draft') {
             return response()->json(['message' => 'Only draft returns can be submitted.'], 422);
         }
@@ -83,30 +78,26 @@ class ReturnController extends Controller
         return response()->json(new ReturnResource($return->fresh()->loadMissing(['items.product', 'warehouse'])));
     }
 
-    public function approve(string|int $id, Request $request): JsonResponse
+    public function approve(ReturnModel $return, Request $request): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         $return = $this->returnService->approve($return, $request->user()->id);
         return response()->json(new ReturnResource($return));
     }
 
-    public function process(string|int $id, Request $request): JsonResponse
+    public function process(ReturnModel $return, Request $request): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         $return = $this->returnService->process($return, $request->user()->id);
         return response()->json(new ReturnResource($return));
     }
 
-    public function reject(string|int $id, Request $request): JsonResponse
+    public function reject(ReturnModel $return, Request $request): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         $return = $this->returnService->reject($return, $request->user()->id, $request->reason);
         return response()->json(new ReturnResource($return));
     }
 
-    public function cancel(string|int $id, Request $request): JsonResponse
+    public function cancel(ReturnModel $return, Request $request): JsonResponse
     {
-        $return = ReturnModel::findOrFail($id);
         $return = $this->returnService->cancel($return, $request->user()->id);
         return response()->json(new ReturnResource($return));
     }

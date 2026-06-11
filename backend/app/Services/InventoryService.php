@@ -6,6 +6,7 @@ use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
 use App\Models\StockTransaction;
 use App\Services\UomConversionService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -135,75 +136,77 @@ class InventoryService
             }
         }
 
-        // Ambil semua inventory records yang masih punya stok
-        $query = Inventory::where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->where('quantity', '>', 0);
+        return DB::transaction(function () use ($productId, $warehouseId, $quantity, $userId, $options, $strategy, $uomId, $quantityInBaseUom) {
+            // Ambil semua inventory records yang masih punya stok — with row locking
+            $query = Inventory::where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('quantity', '>', 0);
 
-        if ($strategy === 'fefo') {
-            // FEFO: item dengan expiry terdekat duluan, lalu yang paling lama diterima
-            $query->orderByRaw('expiry_date ASC NULLS LAST')
-                  ->orderBy('created_at', 'ASC')
-                  ->orderBy('id', 'ASC');
-        } else {
-            // FIFO (default): item paling lama diterima duluan
-            $query->orderBy('created_at', 'ASC')
-                  ->orderBy('id', 'ASC');
-        }
-
-        $records = $query->get();
-
-        $totalAvailable = $records->sum('quantity');
-        if ($totalAvailable < $quantity) {
-            throw new InsufficientStockException(
-                "Insufficient stock for product ID {$productId} in warehouse {$warehouseId}. "
-                    . "Requested: {$quantity}, Available: {$totalAvailable}",
-                $productId,
-                $warehouseId,
-                $quantity,
-                $totalAvailable
-            );
-        }
-
-        $remainingQty = $quantity;
-        $movements = [];
-
-        foreach ($records as $inventory) {
-            if ($remainingQty <= 0) {
-                break;
+            if ($strategy === 'fefo') {
+                // FEFO: item dengan expiry terdekat duluan, lalu yang paling lama diterima
+                $query->orderByRaw('expiry_date ASC NULLS LAST')
+                      ->orderBy('created_at', 'ASC')
+                      ->orderBy('id', 'ASC');
+            } else {
+                // FIFO (default): item paling lama diterima duluan
+                $query->orderBy('created_at', 'ASC')
+                      ->orderBy('id', 'ASC');
             }
 
-            $taken = min($inventory->quantity, $remainingQty);
-            $stockBefore = $inventory->quantity;
+            $records = $query->lockForUpdate()->get();
 
-            $inventory->quantity -= $taken;
-            $inventory->available_quantity -= $taken;
-            $inventory->save();
+            $totalAvailable = $records->sum('quantity');
+            if ($totalAvailable < $quantity) {
+                throw new InsufficientStockException(
+                    "Insufficient stock for product ID {$productId} in warehouse {$warehouseId}. "
+                        . "Requested: {$quantity}, Available: {$totalAvailable}",
+                    $productId,
+                    $warehouseId,
+                    $quantity,
+                    $totalAvailable
+                );
+            }
 
-            $movements[] = StockTransaction::create([
-                'ulid' => (string) Str::ulid(),
-                'transaction_type' => 'GI',
-                'transactionable_type' => $options['reference_type'] ?? null,
-                'transactionable_id' => $options['reference_id'] ?? null,
-                'product_id' => $productId,
-                'warehouse_id' => $warehouseId,
-                'source_warehouse_id' => $warehouseId,
-                'batch_id' => null,
-                'quantity' => $taken,
-                'uom_id' => $uomId,
-                'quantity_in_base_uom' => $quantityInBaseUom,
-                'stock_before' => $stockBefore,
-                'stock_after' => $inventory->quantity,
-                'reference_number' => $options['reference_number'] ?? null,
-                'notes' => $options['notes'] ?? 'Stock Issued',
-                'created_by' => $userId,
-                'created_at' => now(),
-            ]);
+            $remainingQty = $quantity;
+            $movements = [];
 
-            $remainingQty -= $taken;
-        }
+            foreach ($records as $inventory) {
+                if ($remainingQty <= 0) {
+                    break;
+                }
 
-        return $movements;
+                $taken = min($inventory->quantity, $remainingQty);
+                $stockBefore = $inventory->quantity;
+
+                $inventory->quantity -= $taken;
+                $inventory->available_quantity -= $taken;
+                $inventory->save();
+
+                $movements[] = StockTransaction::create([
+                    'ulid' => (string) Str::ulid(),
+                    'transaction_type' => 'GI',
+                    'transactionable_type' => $options['reference_type'] ?? null,
+                    'transactionable_id' => $options['reference_id'] ?? null,
+                    'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
+                    'source_warehouse_id' => $warehouseId,
+                    'batch_id' => null,
+                    'quantity' => $taken,
+                    'uom_id' => $uomId,
+                    'quantity_in_base_uom' => $quantityInBaseUom,
+                    'stock_before' => $stockBefore,
+                    'stock_after' => $inventory->quantity,
+                    'reference_number' => $options['reference_number'] ?? null,
+                    'notes' => $options['notes'] ?? 'Stock Issued',
+                    'created_by' => $userId,
+                    'created_at' => now(),
+                ]);
+
+                $remainingQty -= $taken;
+            }
+
+            return $movements;
+        });
     }
 
     /**
@@ -231,54 +234,50 @@ class InventoryService
                 $quantityInBaseUom = $quantity;
             }
         }
-        // Create a single TR record instead of GI + GR.
 
-        // 2. We should ideally update the GI transaction type to TR, but for simplicity, 
-        // we can just use the receiveStock/issueStock directly, OR write custom logic.
-        // For a true TR, it's better to write custom logic to create exactly one TR record.
-        
-        // Let's create a single TR record instead of GI + GR.
-        // Wait, issueStock and receiveStock will create GI and GR.
-        // We will do a custom manual adjustment here to avoid double logging.
-        
-        $sourceInventory = Inventory::where(['product_id' => $productId, 'warehouse_id' => $sourceWarehouseId])->first();
-        if (!$sourceInventory || $sourceInventory->quantity < $quantity) {
-            throw new \Exception("Insufficient stock for transfer.");
-        }
+        DB::transaction(function () use ($productId, $sourceWarehouseId, $destWarehouseId, $quantity, $userId, $options, $uomId, $quantityInBaseUom) {
+            $sourceInventory = Inventory::where(['product_id' => $productId, 'warehouse_id' => $sourceWarehouseId])
+                ->lockForUpdate()
+                ->first();
 
-        $sourceBefore = $sourceInventory->quantity;
-        $sourceInventory->quantity -= $quantity;
-        $sourceInventory->available_quantity -= $quantity;
-        $sourceInventory->save();
+            if (!$sourceInventory || $sourceInventory->quantity < $quantity) {
+                throw new \Exception("Insufficient stock for transfer.");
+            }
 
-        $destInventory = Inventory::firstOrNew([
-            'product_id' => $productId,
-            'warehouse_id' => $destWarehouseId,
-        ]);
-        $destBefore = $destInventory->quantity ?? 0;
-        $destInventory->quantity += $quantity;
-        $destInventory->available_quantity = ($destInventory->available_quantity ?? 0) + $quantity;
-        $destInventory->save();
+            $sourceBefore = $sourceInventory->quantity;
+            $sourceInventory->quantity -= $quantity;
+            $sourceInventory->available_quantity -= $quantity;
+            $sourceInventory->save();
 
-        StockTransaction::create([
-            'ulid' => (string) Str::ulid(),
-            'transaction_type' => 'TR',
-            'transactionable_type' => $options['reference_type'] ?? null,
-            'transactionable_id' => $options['reference_id'] ?? null,
-            'product_id' => $productId,
-            'warehouse_id' => $sourceWarehouseId, // Record against source
-            'source_warehouse_id' => $sourceWarehouseId,
-            'dest_warehouse_id' => $destWarehouseId,
-            'quantity' => $quantity,
-            'uom_id' => $uomId,
-            'quantity_in_base_uom' => $quantityInBaseUom,
-            'stock_before' => $sourceBefore,
-            'stock_after' => $sourceInventory->quantity,
-            'reference_number' => $options['reference_number'] ?? null,
-            'notes' => $options['notes'] ?? 'Warehouse Transfer',
-            'created_by' => $userId,
-            'created_at' => now(),
-        ]);
+            $destInventory = Inventory::firstOrNew([
+                'product_id' => $productId,
+                'warehouse_id' => $destWarehouseId,
+            ]);
+            $destBefore = $destInventory->quantity ?? 0;
+            $destInventory->quantity += $quantity;
+            $destInventory->available_quantity = ($destInventory->available_quantity ?? 0) + $quantity;
+            $destInventory->save();
+
+            StockTransaction::create([
+                'ulid' => (string) Str::ulid(),
+                'transaction_type' => 'TR',
+                'transactionable_type' => $options['reference_type'] ?? null,
+                'transactionable_id' => $options['reference_id'] ?? null,
+                'product_id' => $productId,
+                'warehouse_id' => $sourceWarehouseId,
+                'source_warehouse_id' => $sourceWarehouseId,
+                'dest_warehouse_id' => $destWarehouseId,
+                'quantity' => $quantity,
+                'uom_id' => $uomId,
+                'quantity_in_base_uom' => $quantityInBaseUom,
+                'stock_before' => $sourceBefore,
+                'stock_after' => $sourceInventory->quantity,
+                'reference_number' => $options['reference_number'] ?? null,
+                'notes' => $options['notes'] ?? 'Warehouse Transfer',
+                'created_by' => $userId,
+                'created_at' => now(),
+            ]);
+        });
     }
 
     /**
@@ -307,48 +306,57 @@ class InventoryService
             }
         }
 
-        $inventory = Inventory::firstOrNew([
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-        ]);
+        DB::transaction(function () use ($productId, $warehouseId, $differenceQty, $userId, $options, $uomId, $quantityInBaseUom) {
+            // Lock the existing row if present; if not, a new model will be created
+            $inventory = Inventory::where(['product_id' => $productId, 'warehouse_id' => $warehouseId])
+                ->lockForUpdate()
+                ->first();
 
-        $stockBefore = $inventory->quantity ?? 0;
-        $newQuantity = ($inventory->quantity ?? 0) + $differenceQty;
-        $newAvailable = ($inventory->available_quantity ?? 0) + $differenceQty;
+            if (!$inventory) {
+                $inventory = new Inventory([
+                    'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
+                ]);
+            }
 
-        // Throw exception instead of silent clamp — negative stock is a data integrity violation
-        if ($newQuantity < 0) {
-            throw new InsufficientStockException(
-                "Insufficient stock for product {$productId} in warehouse {$warehouseId}. "
-                    . "Adjustment would result in {$newQuantity} (requested: {$differenceQty}, current: " . ($inventory->quantity ?? 0) . ")",
-                $productId,
-                $warehouseId,
-                $differenceQty,
-                $inventory->quantity ?? 0
-            );
-        }
+            $stockBefore = $inventory->quantity ?? 0;
+            $newQuantity = ($inventory->quantity ?? 0) + $differenceQty;
+            $newAvailable = ($inventory->available_quantity ?? 0) + $differenceQty;
 
-        $inventory->quantity = $newQuantity;
-        $inventory->available_quantity = $newAvailable;
+            // Throw exception instead of silent clamp — negative stock is a data integrity violation
+            if ($newQuantity < 0) {
+                throw new InsufficientStockException(
+                    "Insufficient stock for product {$productId} in warehouse {$warehouseId}. "
+                        . "Adjustment would result in {$newQuantity} (requested: {$differenceQty}, current: " . ($inventory->quantity ?? 0) . ")",
+                    $productId,
+                    $warehouseId,
+                    $differenceQty,
+                    $inventory->quantity ?? 0
+                );
+            }
 
-        $inventory->save();
+            $inventory->quantity = $newQuantity;
+            $inventory->available_quantity = $newAvailable;
 
-        StockTransaction::create([
-            'ulid' => (string) Str::ulid(),
-            'transaction_type' => $differenceQty > 0 ? 'ADJ+' : 'ADJ-',
-            'transactionable_type' => $options['reference_type'] ?? null,
-            'transactionable_id' => $options['reference_id'] ?? null,
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-            'quantity' => abs($differenceQty),
-            'uom_id' => $uomId,
-            'quantity_in_base_uom' => $quantityInBaseUom,
-            'stock_before' => $stockBefore,
-            'stock_after' => $inventory->quantity,
-            'reference_number' => $options['reference_number'] ?? null,
-            'notes' => $options['notes'] ?? 'Stock Opname Adjustment',
-            'created_by' => $userId,
-            'created_at' => now(),
-        ]);
+            $inventory->save();
+
+            StockTransaction::create([
+                'ulid' => (string) Str::ulid(),
+                'transaction_type' => $differenceQty > 0 ? 'ADJ+' : 'ADJ-',
+                'transactionable_type' => $options['reference_type'] ?? null,
+                'transactionable_id' => $options['reference_id'] ?? null,
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'quantity' => abs($differenceQty),
+                'uom_id' => $uomId,
+                'quantity_in_base_uom' => $quantityInBaseUom,
+                'stock_before' => $stockBefore,
+                'stock_after' => $inventory->quantity,
+                'reference_number' => $options['reference_number'] ?? null,
+                'notes' => $options['notes'] ?? 'Stock Opname Adjustment',
+                'created_by' => $userId,
+                'created_at' => now(),
+            ]);
+        });
     }
 }
