@@ -147,11 +147,15 @@ class ReportController extends Controller
                         DB::raw('COUNT(DISTINCT zones.id) as total_zones'),
                         DB::raw('COUNT(DISTINCT racks.id) as total_racks'),
                         DB::raw('COUNT(DISTINCT rack_slots.id) as total_slots'),
-                        DB::raw('COUNT(DISTINCT CASE WHEN rack_slots.status IS NULL OR rack_slots.status != \'empty\' THEN rack_slots.id END) as used_slots')
+                        DB::raw('COUNT(DISTINCT CASE WHEN slot_stocks.id IS NOT NULL THEN rack_slots.id END) as used_slots')
                     )
                     ->leftJoin('racks', 'racks.zone_id', '=', 'zones.id')
                     ->leftJoin('rack_levels', 'rack_levels.rack_id', '=', 'racks.id')
                     ->leftJoin('rack_slots', 'rack_slots.rack_level_id', '=', 'rack_levels.id')
+                    ->leftJoin('slot_stocks', function ($join) {
+                        $join->on('slot_stocks.slot_id', '=', 'rack_slots.id')
+                             ->where('slot_stocks.is_current', true);
+                    })
                     ->whereIn('zones.warehouse_id', $warehouseIds)
                     ->groupBy('zones.warehouse_id')
                     ->get()
@@ -463,11 +467,15 @@ class ReportController extends Controller
                         DB::raw('COUNT(DISTINCT zones.id) as total_zones'),
                         DB::raw('COUNT(DISTINCT racks.id) as total_racks'),
                         DB::raw('COUNT(DISTINCT rack_slots.id) as total_slots'),
-                        DB::raw('COUNT(DISTINCT CASE WHEN rack_slots.status IS NULL OR rack_slots.status != \'empty\' THEN rack_slots.id END) as used_slots')
+                        DB::raw('COUNT(DISTINCT CASE WHEN slot_stocks.id IS NOT NULL THEN rack_slots.id END) as used_slots')
                     )
                     ->leftJoin('racks', 'racks.zone_id', '=', 'zones.id')
                     ->leftJoin('rack_levels', 'rack_levels.rack_id', '=', 'racks.id')
                     ->leftJoin('rack_slots', 'rack_slots.rack_level_id', '=', 'rack_levels.id')
+                    ->leftJoin('slot_stocks', function ($join) {
+                        $join->on('slot_stocks.slot_id', '=', 'rack_slots.id')
+                             ->where('slot_stocks.is_current', true);
+                    })
                     ->whereIn('zones.warehouse_id', $warehouseIds)
                     ->groupBy('zones.warehouse_id')
                     ->get()
