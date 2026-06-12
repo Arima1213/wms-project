@@ -8,7 +8,7 @@ class UpdateOutboundRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('edit outbounds');
+        return $this->user()->can('outbound.update');
     }
 
     public function rules(): array

@@ -8,7 +8,7 @@ class StoreInboundRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create inbounds');
+        return $this->user()->can('inbound.create');
     }
 
     public function rules(): array

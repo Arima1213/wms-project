@@ -9,31 +9,41 @@ class OutboundPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view outbounds');
+        return $user->can('outbound.view');
     }
 
     public function view(User $user, Outbound $outbound): bool
     {
-        return $user->hasPermissionTo('view outbounds');
+        return $user->can('outbound.view');
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('create outbounds');
+        return $user->can('outbound.create');
     }
 
     public function update(User $user, Outbound $outbound): bool
     {
-        return $user->hasPermissionTo('edit outbounds');
+        return $user->can('outbound.update');
     }
 
     public function delete(User $user, Outbound $outbound): bool
     {
-        return $user->hasPermissionTo('delete outbounds');
+        return $user->can('outbound.delete');
+    }
+
+    public function pick(User $user, Outbound $outbound): bool
+    {
+        return $user->can('outbound.pick');
     }
 
     public function ship(User $user, Outbound $outbound): bool
     {
-        return $user->hasPermissionTo('ship outbounds');
+        return $user->can('outbound.ship');
+    }
+
+    public function cancel(User $user, Outbound $outbound): bool
+    {
+        return $user->can('outbound.cancel');
     }
 }

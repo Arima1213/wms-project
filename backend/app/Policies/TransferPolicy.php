@@ -9,26 +9,31 @@ class TransferPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('view transfers');
+        return $user->can('transfer.view');
     }
 
     public function view(User $user, Transfer $transfer): bool
     {
-        return $user->hasPermissionTo('view transfers');
+        return $user->can('transfer.view');
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('create transfers');
+        return $user->can('transfer.create');
     }
 
     public function approve(User $user, Transfer $transfer): bool
     {
-        return $user->hasPermissionTo('approve transfers');
+        return $user->can('transfer.approve');
+    }
+
+    public function reject(User $user, Transfer $transfer): bool
+    {
+        return $user->can('transfer.reject');
     }
 
     public function execute(User $user, Transfer $transfer): bool
     {
-        return $user->hasPermissionTo('execute transfers');
+        return $user->can('transfer.execute');
     }
 }

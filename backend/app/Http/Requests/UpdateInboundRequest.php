@@ -8,7 +8,7 @@ class UpdateInboundRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('edit inbounds');
+        return $this->user()->can('inbound.update');
     }
 
     public function rules(): array

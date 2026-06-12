@@ -8,7 +8,7 @@ class StoreTransferRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create transfers');
+        return $this->user()->can('transfer.create');
     }
 
     public function rules(): array

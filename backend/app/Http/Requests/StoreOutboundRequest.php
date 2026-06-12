@@ -8,7 +8,7 @@ class StoreOutboundRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create outbounds');
+        return $this->user()->can('outbound.create');
     }
 
     public function rules(): array
