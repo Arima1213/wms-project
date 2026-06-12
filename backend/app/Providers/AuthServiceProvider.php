@@ -2,26 +2,30 @@
 
 namespace App\Providers;
 
+use App\Models\AuditLog;
+use App\Models\Category;
+use App\Models\Document;
 use App\Models\Inbound;
+use App\Models\Inventory;
+use App\Models\Notification;
 use App\Models\Outbound;
+use App\Models\Planogram;
 use App\Models\Product;
-use App\Models\Warehouse;
-use App\Models\Zone;
 use App\Models\Rack;
 use App\Models\RackSlot;
-use App\Models\Category;
-use App\Models\Transfer;
+use App\Models\Setting;
 use App\Models\StockOpname;
-use App\Models\Planogram;
-use App\Models\Document;
-use App\Models\Inventory;
+use App\Models\Transfer;
 use App\Models\User;
-use App\Models\Notification;
+use App\Models\Warehouse;
+use App\Models\Zone;
+use App\Policies\AuditLogPolicy;
 use App\Policies\InboundPolicy;
 use App\Policies\OutboundPolicy;
-use App\Policies\WarehousePolicy;
-use App\Policies\TransferPolicy;
+use App\Policies\SettingPolicy;
 use App\Policies\StockOpnamePolicy;
+use App\Policies\TransferPolicy;
+use App\Policies\WarehousePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 
@@ -43,6 +47,8 @@ class AuthServiceProvider extends ServiceProvider
         Inventory::class => InventoryPolicy::class,
         User::class => UserPolicy::class,
         Notification::class => \App\Policies\NotificationPolicy::class,
+        Setting::class => SettingPolicy::class,
+        AuditLog::class => AuditLogPolicy::class,
     ];
 
     public function boot(): void

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
 use Illuminate\Support\Facades\Cache;
+use App\Models\StockTransaction;
 use App\Services\UomConversionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

@@ -11,6 +11,8 @@ class AuditLogController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', AuditLog::class);
+
         $query = AuditLog::with('user:id,name')
             ->when($request->entity_type, fn($q) => $q->where('entity_type', $request->entity_type))
             ->when($request->user_id, fn($q) => $q->where('user_id', $request->user_id))

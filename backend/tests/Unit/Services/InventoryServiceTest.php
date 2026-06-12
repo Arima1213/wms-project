@@ -4,12 +4,14 @@ namespace Tests\Unit\Services;
 
 use App\Exceptions\InsufficientStockException;
 use App\Models\Inventory;
+use Symfony\Component\Uid\Ulid;
 use App\Models\Product;
 use App\Models\StockTransaction;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class InventoryServiceTest extends TestCase
@@ -63,7 +65,7 @@ class InventoryServiceTest extends TestCase
     }
 
     /** @test */
-    public function it_can_issue_stock_and_record_gi_transaction()
+                public function it_can_issue_stock_and_record_gi_transaction()
     {
         // Arrange - first receive stock
         $this->inventoryService->receiveStock(
@@ -73,8 +75,8 @@ class InventoryServiceTest extends TestCase
             $this->user->id
         );
 
-        // Act
-        $inventory = $this->inventoryService->issueStock(
+        // Act - issueStock returns array of movements
+        $movements = $this->inventoryService->issueStock(
             $this->product->id,
             $this->warehouse->id,
             50.0,
@@ -87,20 +89,27 @@ class InventoryServiceTest extends TestCase
             ]
         );
 
-        // Assert inventory decreased
+        // Assert inventory decreased (from DB)
+        $inventory = \App\Models\Inventory::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
         $this->assertNotNull($inventory);
-        $this->assertEquals(150.0, $inventory->quantity);
-        $this->assertEquals(150.0, $inventory->available_quantity);
+        $this->assertEquals(150.0, (float) $inventory->quantity);
+        $this->assertEquals(150.0, (float) $inventory->available_quantity);
 
-        // Assert transaction
+        // Assert movements returned
+        $this->assertCount(1, $movements);
+        $this->assertEquals(50.0, (float) $movements[0]->quantity);
+
+        // Assert GI transaction
         $transaction = StockTransaction::where('transaction_type', 'GI')->first();
         $this->assertNotNull($transaction);
-        $this->assertEquals(50.0, $transaction->quantity);
+        $this->assertEquals(50.0, (float) $transaction->quantity);
         $this->assertEquals('Test issue', $transaction->notes);
+        $this->assertEquals($this->product->id, $transaction->product_id);
     }
 
-    /** @test */
-    public function it_throws_exception_when_issuing_more_stock_than_available()
+public function it_throws_exception_when_issuing_more_stock_than_available()
     {
         // Arrange - no stock yet
         $this->expectException(\Exception::class);
@@ -238,4 +247,211 @@ class InventoryServiceTest extends TestCase
 
         $this->assertEquals(75, $updated->quantity);
     }
+
+    /** @test */
+    public function test_issueStock_wraps_in_db_transaction()
+    {
+        // Create two inventory batches with stock for a true mid-loop rollback test
+        Inventory::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'batch_number' => 'BATCH-A',
+            'quantity' => 50,
+            'available_quantity' => 50,
+        ]);
+        Inventory::factory()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'batch_number' => 'BATCH-B',
+            'quantity' => 50,
+            'available_quantity' => 50,
+        ]);
+
+        // Pre-create a StockTransaction with a known ulid that will cause collision on second insert
+        $collisionUlid = '01H5ABCDEFGHIJKLMNOPQRSTUVWX';
+        StockTransaction::create([
+            'ulid' => $collisionUlid,
+            'transaction_type' => 'GR',
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 0,
+            'quantity_in_base_uom' => 0,
+            'stock_before' => 0,
+            'stock_after' => 0,
+            'created_by' => $this->user->id,
+            'created_at' => now(),
+        ]);
+
+        // Use Str::createUlidsUsing to control ULID generation:
+        // first call returns unique, second returns collision
+        $ulidCallCount = 0;
+        Str::createUlidsUsing(function () use ($collisionUlid, &$ulidCallCount) {
+            $ulidCallCount++;
+            if ($ulidCallCount === 1) {
+                return new Ulid(); // unique
+            }
+            return new Ulid($collisionUlid); // collision
+        });
+
+        try {
+            $this->inventoryService->issueStock(
+                $this->product->id,
+                $this->warehouse->id,
+                60, // will consume from both batches
+                $this->user->id,
+                ['notes' => 'Test transaction rollback']
+            );
+            $this->fail('Expected exception was not thrown');
+        } catch (\Exception $e) {
+            // Expected — unique constraint violation on second StockTransaction insert
+        }
+
+        // Restore normal ULID generation
+        Str::createUlidsNormally();
+
+        // Assert inventory records were rolled back
+        $this->assertDatabaseHas('inventory', [
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'batch_number' => 'BATCH-A',
+            'quantity' => 50,
+        ]);
+        $this->assertDatabaseHas('inventory', [
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'batch_number' => 'BATCH-B',
+            'quantity' => 50,
+        ]);
+
+        // Assert no GI transaction was persisted (the first one was rolled back too)
+        $this->assertEquals(0, StockTransaction::where('transaction_type', 'GI')->count());
+    }
+
+
+
+    /** @test */
+    public function test_adjustStock_wraps_in_db_transaction()
+    {
+        // Arrange — receive stock
+        $this->inventoryService->receiveStock(
+            $this->product->id,
+            $this->warehouse->id,
+            100.0,
+            $this->user->id
+        );
+
+        // Pre-create a StockTransaction whose ulid will cause a collision
+        $collisionUlid = '01H5ABCDEFGHIJKLMNOPQRSTUVWY';
+        StockTransaction::create([
+            'ulid' => $collisionUlid,
+            'transaction_type' => 'GR',
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 0,
+            'quantity_in_base_uom' => 0,
+            'stock_before' => 100,
+            'stock_after' => 100,
+            'created_by' => $this->user->id,
+            'created_at' => now(),
+        ]);
+
+        // Override ULID factory to always return the collision value
+        Str::createUlidsUsing(function () use ($collisionUlid) {
+            return new Ulid($collisionUlid);
+        });
+
+        try {
+            $this->inventoryService->adjustStock(
+                $this->product->id,
+                $this->warehouse->id,
+                50.0,
+                $this->user->id,
+                ['notes' => 'Test adjust rollback']
+            );
+            $this->fail('Expected exception was not thrown');
+        } catch (\Exception $e) {
+            // Expected — unique constraint violation
+        }
+
+        // Restore normal ULID generation
+        Str::createUlidsNormally();
+
+        // Assert inventory unchanged
+        $inventory = Inventory::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+        $this->assertEquals(100.0, (float) $inventory->quantity);
+        $this->assertEquals(100.0, (float) $inventory->available_quantity);
+
+        // Assert no ADJ+ transaction was saved
+        $this->assertEquals(0, StockTransaction::where('transaction_type', 'ADJ+')->count());
+    }
+
+
+
+    /** @test */
+    public function test_transferStock_wraps_in_db_transaction()
+    {
+        // Arrange — receive stock in source warehouse
+        $destWarehouse = Warehouse::factory()->create();
+        $this->inventoryService->receiveStock(
+            $this->product->id,
+            $this->warehouse->id,
+            100.0,
+            $this->user->id
+        );
+
+        // Pre-create a StockTransaction whose ulid will cause a collision
+        $collisionUlid = '01H5ABCDEFGHIJKLMNOPQRSTUVWZ';
+        StockTransaction::create([
+            'ulid' => $collisionUlid,
+            'transaction_type' => 'GR',
+            'product_id' => $this->product->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 0,
+            'quantity_in_base_uom' => 0,
+            'stock_before' => 100,
+            'stock_after' => 100,
+            'created_by' => $this->user->id,
+            'created_at' => now(),
+        ]);
+
+        // Override ULID factory to always return the collision value
+        Str::createUlidsUsing(function () use ($collisionUlid) {
+            return new Ulid($collisionUlid);
+        });
+
+        try {
+            $this->inventoryService->transferStock(
+                $this->product->id,
+                $this->warehouse->id,
+                $destWarehouse->id,
+                50.0,
+                $this->user->id,
+                ['notes' => 'Test transfer rollback']
+            );
+            $this->fail('Expected exception was not thrown');
+        } catch (\Exception $e) {
+            // Expected — unique constraint violation
+        }
+
+        // Restore normal ULID generation
+        Str::createUlidsNormally();
+
+        // Assert source inventory unchanged
+        $sourceInventory = Inventory::where('product_id', $this->product->id)
+            ->where('warehouse_id', $this->warehouse->id)
+            ->first();
+        $this->assertEquals(100.0, (float) $sourceInventory->quantity);
+
+        // Assert destination inventory was NOT created
+        $this->assertNull(Inventory::where('product_id', $this->product->id)
+            ->where('warehouse_id', $destWarehouse->id)
+            ->first());
+
+        // Assert no TR transaction was saved
+        $this->assertEquals(0, StockTransaction::where('transaction_type', 'TR')->count());
+    }
+
+
 }

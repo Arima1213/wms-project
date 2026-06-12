@@ -26,5 +26,7 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="REDIS_CLIENT" value="predis"/>
         <env name="REDIS_HOST" value="127.0.0.1"/>
+        <env name="SCOUT_DRIVER" value="null"/>
+        <env name="MEILISEARCH_HOST" value="http://localhost:7700"/>
     </php>
 </phpunit>

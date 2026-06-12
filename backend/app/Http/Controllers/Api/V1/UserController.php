@@ -13,6 +13,8 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', User::class);
+
         $query = User::query()->with('roles:id,name');
         if ($request->has('search')) {
             $query->where('name', 'ilike', '%' . $request->search . '%')

@@ -82,6 +82,7 @@ return new class extends Migration
             $table->unsignedBigInteger('counted_by')->nullable();
             $table->timestamp('counted_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
             $table->foreign('slot_id')->references('id')->on('rack_slots')->nullOnDelete();
             $table->foreign('counted_by')->references('id')->on('users')->nullOnDelete();
             $table->index('stock_opname_id');
